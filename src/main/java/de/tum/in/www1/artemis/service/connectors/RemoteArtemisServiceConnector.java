@@ -18,7 +18,7 @@ import de.tum.in.www1.artemis.exception.NetworkingError;
  * @param <RequestType> DTO class, describing the body of the network request.
  * @param <ResponseType> DTO class, describing the body of the network response.
  */
-class RemoteArtemisServiceConnector<RequestType, ResponseType> {
+public class RemoteArtemisServiceConnector<RequestType, ResponseType> {
 
     private final Logger log;
 
@@ -26,7 +26,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
 
     private final Class<ResponseType> genericResponseType;
 
-    RemoteArtemisServiceConnector(Logger log, Class<ResponseType> genericResponseType) {
+    public RemoteArtemisServiceConnector(Logger log, Class<ResponseType> genericResponseType) {
         this.log = log;
         this.genericResponseType = genericResponseType;
     }
@@ -39,7 +39,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
      * @return response body from remote service
      * @throws NetworkingError exception in case of unsuccessful responses or responses without a body.
      */
-    ResponseType invoke(@NotNull String url, @NotNull RequestType requestObject) throws NetworkingError {
+    public ResponseType invoke(@NotNull String url, @NotNull RequestType requestObject) throws NetworkingError {
         return invoke(url, requestObject, null);
     }
 
@@ -52,7 +52,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
      * @return response body from remote service
      * @throws NetworkingError exception in case of unsuccessful responses or responses without a body.
      */
-    ResponseType invoke(@NotNull String url, @NotNull RequestType requestObject, HttpHeaders headers) throws NetworkingError {
+    public ResponseType invoke(@NotNull String url, @NotNull RequestType requestObject, HttpHeaders headers) throws NetworkingError {
         long start = System.currentTimeMillis();
         log.debug("Calling Remote Artemis Service.");
 
@@ -85,7 +85,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
      * @return response body from remote service
      * @throws NetworkingError exception in case of unsuccessful responses or responses without a body.
      */
-    ResponseType invokeWithRetry(@NotNull String url, @NotNull RequestType requestObject, int maxRetries) throws NetworkingError {
+    public ResponseType invokeWithRetry(@NotNull String url, @NotNull RequestType requestObject, int maxRetries) throws NetworkingError {
         return invokeWithRetry(url, requestObject, null, maxRetries);
     }
 
@@ -99,7 +99,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
      * @return response body from remote service
      * @throws NetworkingError exception in case of unsuccessful responses or responses without a body.
      */
-    ResponseType invokeWithRetry(@NotNull String url, @NotNull RequestType requestObject, HttpHeaders headers, int maxRetries) throws NetworkingError {
+    public ResponseType invokeWithRetry(@NotNull String url, @NotNull RequestType requestObject, HttpHeaders headers, int maxRetries) throws NetworkingError {
         for (int retries = 0;; retries++) {
             try {
                 return invoke(url, requestObject, headers);
@@ -130,7 +130,7 @@ class RemoteArtemisServiceConnector<RequestType, ResponseType> {
      * @param secret Authorization secret
      * @return HttpHeaders
      */
-    static HttpHeaders authorizationHeaderForSymmetricSecret(String secret) {
+    public static HttpHeaders authorizationHeaderForSymmetricSecret(String secret) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", secret);
         return headers;

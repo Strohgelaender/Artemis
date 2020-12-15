@@ -44,7 +44,7 @@ final class QuizExerciseDistributedCache extends QuizExerciseCache implements Ha
     /**
      * All {@link List} classes that are supported by Hazelcast {@link SerializationServiceV1}
      */
-    private static final Set<Class<?>> SUPPORTED_LIST_CLASSES = Set.of(ArrayList.class, LinkedList.class, CopyOnWriteArrayList.class);
+    private static final Set<Class<?>> SUPPORTED_LIST_CLASSES = Set.of(ArrayList.class, ArrayList.class, CopyOnWriteArrayList.class);
 
     /**
      * Make sure this is a class of SUPPORTED_LIST_CLASSES to make easy serialization possible, see {@link SerializationServiceV1}
@@ -161,9 +161,9 @@ final class QuizExerciseDistributedCache extends QuizExerciseCache implements Ha
      * We cannot use standard Java-serialization here, because the individual fields of {@link QuizExerciseDistributedCache}
      * need to use different serialization mechanisms (e.g. {@link ScheduledTaskHandler} is not {@link Serializable}).
      * <p>
-     * We don't serialize and deserialize the quiz exercise here because it is not directly written to Hazelcast but only 
-     * set transiently. Setting it here as well could cause an old exercise version to be loaded when Hazelcast decides 
-     * to deserialize the quiz exercise cache again. (It is really hard to predict or influence that, so we don't do that.) 
+     * We don't serialize and deserialize the quiz exercise here because it is not directly written to Hazelcast but only
+     * set transiently. Setting it here as well could cause an old exercise version to be loaded when Hazelcast decides
+     * to deserialize the quiz exercise cache again. (It is really hard to predict or influence that, so we don't do that.)
      */
     static class QuizExerciseDistributedCacheStreamSerializer implements StreamSerializer<QuizExerciseDistributedCache> {
 

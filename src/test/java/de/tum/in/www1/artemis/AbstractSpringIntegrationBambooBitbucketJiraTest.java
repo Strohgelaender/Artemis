@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -93,7 +92,7 @@ public abstract class AbstractSpringIntegrationBambooBitbucketJiraTest extends A
     @Override
     public List<Verifiable> mockConnectorRequestsForStartParticipation(ProgrammingExercise exercise, String username, Set<User> users, boolean ltiUserExists)
             throws IOException, URISyntaxException {
-        final var verifications = new LinkedList<Verifiable>();
+        final var verifications = new ArrayList<Verifiable>();
         bitbucketRequestMockProvider.mockConfigureRepository(exercise, username, users, ltiUserExists);
         bambooRequestMockProvider.mockCopyBuildPlanForParticipation(exercise, username);
         mockUpdatePlanRepositoryForParticipation(exercise, username);

@@ -252,7 +252,7 @@ public class ProgrammingSubmissionResource {
 
         log.info("Trigger (failed) instructor build for participations {} in exercise {} with id {}", participationIds, programmingExercise.getTitle(),
                 programmingExercise.getId());
-        List<ProgrammingExerciseParticipation> participations = new LinkedList<>(
+        List<ProgrammingExerciseParticipation> participations = new ArrayList<>(
                 programmingExerciseParticipationService.findByExerciseAndParticipationIds(exerciseId, participationIds));
 
         var index = 0;

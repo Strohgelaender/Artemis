@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 import javax.validation.constraints.NotNull;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -14,11 +13,12 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 
-import de.tum.in.www1.artemis.config.auth.JiraAuthorizationInterceptor;
+import de.tum.in.www1.artemis.service.connectors.athene.AtheneAuthorizationInterceptor;
 import de.tum.in.www1.artemis.service.connectors.bamboo.BambooAuthorizationInterceptor;
 import de.tum.in.www1.artemis.service.connectors.bitbucket.BitbucketAuthorizationInterceptor;
 import de.tum.in.www1.artemis.service.connectors.gitlab.GitLabAuthorizationInterceptor;
 import de.tum.in.www1.artemis.service.connectors.jenkins.JenkinsAuthorizationInterceptor;
+import de.tum.in.www1.artemis.service.connectors.jira.JiraAuthorizationInterceptor;
 
 /**
  * For now only provides a basic {@link org.springframework.web.client.RestTemplate RestTemplate} bean. Can be extended
@@ -29,21 +29,18 @@ public class RestTemplateConfiguration {
 
     @Bean
     @Profile("gitlab")
-    @Autowired
     public RestTemplate gitlabRestTemplate(GitLabAuthorizationInterceptor gitlabInterceptor) {
         return initializeRestTemplateWithInterceptors(gitlabInterceptor);
     }
 
     @Bean
     @Profile("jenkins")
-    @Autowired
     public RestTemplate jenkinsRestTemplate(JenkinsAuthorizationInterceptor jenkinsInterceptor) {
         return initializeRestTemplateWithInterceptors(jenkinsInterceptor);
     }
 
     @Bean
     @Profile("jira")
-    @Autowired
     public RestTemplate jiraRestTemplate(JiraAuthorizationInterceptor jiraAuthorizationInterceptor) {
         return initializeRestTemplateWithInterceptors(jiraAuthorizationInterceptor);
     }
@@ -58,6 +55,12 @@ public class RestTemplateConfiguration {
     @Profile("bamboo")
     public RestTemplate bambooRestTemplate(BambooAuthorizationInterceptor bambooAuthorizationInterceptor) {
         return initializeRestTemplateWithInterceptors(bambooAuthorizationInterceptor);
+    }
+
+    @Bean
+    @Profile("athene")
+    public RestTemplate atheneRestTemplate(AtheneAuthorizationInterceptor atheneAuthorizationInterceptor) {
+        return initializeRestTemplateWithInterceptors(atheneAuthorizationInterceptor);
     }
 
     @NotNull

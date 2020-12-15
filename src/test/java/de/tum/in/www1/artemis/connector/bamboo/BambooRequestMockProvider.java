@@ -10,7 +10,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.ZonedDateTime;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -331,7 +331,7 @@ public class BambooRequestMockProvider {
 
         changes.setSize(0);
         changes.setExpand("change");
-        changes.setChanges(new LinkedList<>());
+        changes.setChanges(new ArrayList<>());
         buildResult.setChanges(changes);
 
         buildLink.setLinkToArtifact(new URL(bambooServerUrl + "/download/"));

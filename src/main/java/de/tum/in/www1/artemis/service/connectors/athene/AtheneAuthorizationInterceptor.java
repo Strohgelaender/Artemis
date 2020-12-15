@@ -1,4 +1,4 @@
-package de.tum.in.www1.artemis.config.auth;
+package de.tum.in.www1.artemis.service.connectors.athene;
 
 import java.io.IOException;
 
@@ -13,22 +13,17 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 
+@Profile("athene")
 @Component
-@Profile("jira")
-public class JiraAuthorizationInterceptor implements ClientHttpRequestInterceptor {
+public class AtheneAuthorizationInterceptor implements ClientHttpRequestInterceptor {
 
-    @Value("${artemis.user-management.external.user}")
-    private String JIRA_USER;
-
-    @Value("${artemis.user-management.external.password}")
-    private String JIRA_PASSWORD;
+    @Value("${artemis.athene.base64-secret}")
+    private String apiSecret;
 
     @NotNull
     @Override
     public ClientHttpResponse intercept(HttpRequest request, @NotNull byte[] body, @NotNull ClientHttpRequestExecution execution) throws IOException {
-        if (!request.getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
-            request.getHeaders().setBasicAuth(JIRA_USER, JIRA_PASSWORD);
-        }
+        request.getHeaders().set(HttpHeaders.AUTHORIZATION, apiSecret);
         return execution.execute(request, body);
     }
 }

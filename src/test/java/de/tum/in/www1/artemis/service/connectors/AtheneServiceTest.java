@@ -29,6 +29,7 @@ import de.tum.in.www1.artemis.domain.enumeration.Language;
 import de.tum.in.www1.artemis.repository.*;
 import de.tum.in.www1.artemis.service.TextAssessmentQueueService;
 import de.tum.in.www1.artemis.service.TextSubmissionService;
+import de.tum.in.www1.artemis.service.connectors.athene.AtheneService;
 import de.tum.in.www1.artemis.util.ModelFactory;
 import de.tum.in.www1.artemis.web.rest.dto.AtheneDTO;
 
@@ -171,7 +172,7 @@ public class AtheneServiceTest extends AbstractSpringIntegrationBambooBitbucketJ
         when(textBlockRepository.saveAll(anyIterable())).thenAnswer(invocation -> {
             List<TextBlock> set = invocation.getArgument(0);
             // Check for correct number of textBlocks
-            if (set instanceof LinkedList) {
+            if (set instanceof ArrayList) {
                 assertThat(set, hasSize(10));
             }
             else if (set instanceof ArrayList) {

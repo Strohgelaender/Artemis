@@ -1,7 +1,6 @@
-package de.tum.in.www1.artemis.service.connectors;
+package de.tum.in.www1.artemis.service.connectors.athene;
 
 import static de.tum.in.www1.artemis.config.Constants.ATHENE_RESULT_API_PATH;
-import static de.tum.in.www1.artemis.service.connectors.RemoteArtemisServiceConnector.authorizationHeaderForSymmetricSecret;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -24,6 +23,7 @@ import de.tum.in.www1.artemis.repository.TextClusterRepository;
 import de.tum.in.www1.artemis.repository.TextExerciseRepository;
 import de.tum.in.www1.artemis.service.TextAssessmentQueueService;
 import de.tum.in.www1.artemis.service.TextSubmissionService;
+import de.tum.in.www1.artemis.service.connectors.RemoteArtemisServiceConnector;
 import de.tum.in.www1.artemis.web.rest.dto.AtheneDTO;
 
 @Service
@@ -37,9 +37,6 @@ public class AtheneService {
 
     @Value("${artemis.athene.submit-url}")
     private String submitApiEndpoint;
-
-    @Value("${artemis.athene.base64-secret}")
-    private String apiSecret;
 
     private final TextAssessmentQueueService textAssessmentQueueService;
 
@@ -157,7 +154,7 @@ public class AtheneService {
 
         try {
             final RequestDTO request = new RequestDTO(exercise.getId(), textSubmissions, artemisServerUrl + ATHENE_RESULT_API_PATH + exercise.getId());
-            ResponseDTO response = connector.invokeWithRetry(submitApiEndpoint, request, authorizationHeaderForSymmetricSecret(apiSecret), maxRetries);
+            ResponseDTO response = connector.invokeWithRetry(submitApiEndpoint, request, null, maxRetries);
             log.info("Remote Service to calculate automatic feedback responded: " + response.detail);
 
             // Register task for exercise as running, AtheneResource calls finishTask on result receive
@@ -205,7 +202,7 @@ public class AtheneService {
         Map<Long, TextSubmission> submissionsMap = submissions.stream().collect(toMap(/* Key: */ Submission::getId, /* Value: */ submission -> submission));
 
         // Map textBlocks to submissions
-        List<TextBlock> textBlocks = new LinkedList();
+        List<TextBlock> textBlocks = new ArrayList<>();
         for (AtheneDTO.TextBlockDTO textBlockDTO : blocks) {
             // Convert DTO-TextBlock (including the submissionId) to TextBlock Entity
             TextBlock newBlock = new TextBlock();

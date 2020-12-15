@@ -503,7 +503,7 @@ public class JenkinsService implements ContinuousIntegrationService {
             }
 
             // Jenkins logs all steps of the build pipeline. We remove those as they are irrelevant to the students
-            LinkedList<BuildLogEntry> prunedBuildLog = new LinkedList<>();
+            ArrayList<BuildLogEntry> prunedBuildLog = new ArrayList<>();
             final Iterator<BuildLogEntry> buildlogIterator = buildLog.iterator();
             while (buildlogIterator.hasNext()) {
                 BuildLogEntry entry = buildlogIterator.next();
@@ -539,7 +539,7 @@ public class JenkinsService implements ContinuousIntegrationService {
     }
 
     private List<BuildLogEntry> parsePipelineLogs(Element logHtml) throws IllegalArgumentException {
-        final var buildLog = new LinkedList<BuildLogEntry>();
+        final var buildLogs = new LinkedList<BuildLogEntry>();
         if (logHtml.childNodes().stream().noneMatch(child -> child.attr("class").contains("pipeline"))) {
             throw new IllegalArgumentException("Log is not pipeline log");
         }
@@ -563,25 +563,25 @@ public class JenkinsService implements ContinuousIntegrationService {
                                 contentCandidate = nodeIterator.next();
                             }
                             log = reduceToText(contentCandidate);
-                            buildLog.add(new BuildLogEntry(time, stripLogEndOfLine(log).trim()));
+                            buildLogs.add(new BuildLogEntry(time, stripLogEndOfLine(log).trim()));
                         }
                         else {
                             // Log is from the same line as the last
                             // Look for next text node in children
                             log = reduceToText(node);
-                            final var lastLog = buildLog.getLast();
+                            final var lastLog = buildLogs.getLast();
                             lastLog.setLog(lastLog.getLog() + stripLogEndOfLine(log).trim());
                         }
                     }
                 }
             }
         }
-        return buildLog;
+        return buildLogs;
 
     }
 
     private List<BuildLogEntry> parseLogsLegacy(Element logHtml) {
-        final var buildLog = new LinkedList<BuildLogEntry>();
+        final var buildLogs = new LinkedList<BuildLogEntry>();
         final var iterator = logHtml.childNodes().iterator();
         while (iterator.hasNext()) {
             final var node = iterator.next();
@@ -591,17 +591,17 @@ public class JenkinsService implements ContinuousIntegrationService {
                 final var timeAsString = ((TextNode) node.childNode(0).childNode(0)).getWholeText();
                 final var time = ZonedDateTime.parse(timeAsString, logDateTimeFormatter);
                 log = reduceToText(iterator.next());
-                buildLog.add(new BuildLogEntry(time, stripLogEndOfLine(log)));
+                buildLogs.add(new BuildLogEntry(time, stripLogEndOfLine(log)));
             }
             else {
                 // Log is from the same line as the last
                 // Look for next text node in children
                 log = reduceToText(node);
-                final var lastLog = buildLog.getLast();
+                final var lastLog = buildLogs.getLast();
                 lastLog.setLog(lastLog.getLog() + stripLogEndOfLine(log));
             }
         }
-        return buildLog;
+        return buildLogs;
     }
 
     private String stripLogEndOfLine(String log) {

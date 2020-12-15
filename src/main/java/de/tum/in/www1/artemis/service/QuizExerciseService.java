@@ -291,7 +291,7 @@ public class QuizExerciseService {
         if (quizExercises.size() > 0) {
             Course course = quizExercises.get(0).getCourseViaExerciseGroupOrCourseMember();
             if (!authCheckService.isTeachingAssistantInCourse(course, user) && !authCheckService.isInstructorInCourse(course, user) && !authCheckService.isAdmin(user)) {
-                return new LinkedList<>();
+                return new ArrayList<>();
             }
         }
         return quizExercises;

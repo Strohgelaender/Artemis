@@ -241,7 +241,7 @@ public class ProgrammingSubmissionService extends SubmissionService {
 
         // Let the instructor know that a build run was triggered.
         notifyInstructorAboutStartedExerciseBuildRun(programmingExercise);
-        List<ProgrammingExerciseParticipation> participations = new LinkedList<>(programmingExerciseParticipationService.findByExerciseId(exerciseId));
+        List<ProgrammingExerciseParticipation> participations = new ArrayList<>(programmingExerciseParticipationService.findByExerciseId(exerciseId));
 
         var index = 0;
         for (var participation : participations) {

@@ -418,7 +418,7 @@ public class ProgrammingExerciseScheduleService implements IExerciseScheduleServ
         if (programmingExercise.isEmpty()) {
             throw new EntityNotFoundException("programming exercise not found with id " + programmingExerciseId);
         }
-        List<ProgrammingExerciseStudentParticipation> failedOperations = new LinkedList<>();
+        List<ProgrammingExerciseStudentParticipation> failedOperations = new ArrayList<>();
 
         for (StudentParticipation studentParticipation : programmingExercise.get().getStudentParticipations()) {
             ProgrammingExerciseStudentParticipation programmingExerciseStudentParticipation = (ProgrammingExerciseStudentParticipation) studentParticipation;
