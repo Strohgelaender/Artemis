@@ -429,8 +429,33 @@ export class ShortAnswerQuestionUtil {
      * @returns {string[][]}
      */
     transformTextPartsIntoHTML(textParts: string[][], artemisMarkdown: ArtemisMarkdownService): string[][] {
-        const formattedTextParts = textParts.map((textPart) => textPart.map((element) => artemisMarkdown.htmlForMarkdown(element.trim())));
-        return this.addIndentationToTextParts(textParts, formattedTextParts);
+        const preprocessedTextParts = this.preprocessTextParts(textParts);
+        const formattedTextParts = preprocessedTextParts.map((textPart) => textPart.map((element) => artemisMarkdown.htmlForMarkdown(element.trim())));
+        return this.addIndentationToTextParts(preprocessedTextParts, formattedTextParts);
+    }
+
+    preprocessTextParts(textParts: string[][]): string[][] {
+        let isCode = false;
+        const entriesToDelete: number[] = [];
+        for (let i = 0; i < textParts.length; i++) {
+            if (!textParts[i][0]) {
+                entriesToDelete.push(i);
+                continue;
+            } else if (textParts[i][0].includes('```')) {
+                // start/end of a code segment
+                isCode = !isCode;
+                entriesToDelete.push(i);
+                continue;
+            }
+            for (let j = 0; j < textParts[i].length; j++) {
+                // in code segment and not a spot
+                if (isCode && !textParts[i][j].includes('[-spot')) {
+                    textParts[i][j] = '`' + textParts[i][j] + '`';
+                }
+                textParts[i][j] = textParts[i][j].split('\r').join('');
+            }
+        }
+        return textParts.filter((line, i) => !entriesToDelete.includes(i));
     }
 
     /**
