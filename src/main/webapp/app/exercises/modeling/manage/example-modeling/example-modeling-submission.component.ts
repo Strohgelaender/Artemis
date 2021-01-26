@@ -18,6 +18,7 @@ import { ModelingExercise } from 'app/entities/modeling-exercise.model';
 import { ModelingAssessmentComponent } from 'app/exercises/modeling/assess/modeling-assessment.component';
 import { concatMap, tap } from 'rxjs/operators';
 import { getLatestSubmissionResult, setLatestSubmissionResult } from 'app/entities/submission.model';
+import { getPositiveAndCappedTotalScore } from 'app/exercises/shared/exercise/exercise-utils';
 
 @Component({
     selector: 'jhi-example-modeling-submission',
@@ -37,6 +38,7 @@ export class ExampleModelingSubmissionComponent implements OnInit {
     exampleSubmission: ExampleSubmission;
     modelingSubmission: ModelingSubmission;
     umlModel: UMLModel;
+    explanationText: string;
     feedbacks: Feedback[] = [];
     feedbackChanged = false;
     assessmentsAreValid = false;
@@ -105,6 +107,8 @@ export class ExampleModelingSubmissionComponent implements OnInit {
                 if (this.modelingSubmission.model) {
                     this.umlModel = JSON.parse(this.modelingSubmission.model);
                 }
+                // Updates the explanation text with example modeling submission's explanation
+                this.explanationText = this.modelingSubmission.explanationText ?? '';
             }
             this.usedForTutorial = this.exampleSubmission.usedForTutorial!;
             this.assessmentExplanation = this.exampleSubmission.assessmentExplanation!;
@@ -135,6 +139,7 @@ export class ExampleModelingSubmissionComponent implements OnInit {
     private createNewExampleModelingSubmission(): void {
         const modelingSubmission: ModelingSubmission = new ModelingSubmission();
         modelingSubmission.model = JSON.stringify(this.modelingEditor.getCurrentModel());
+        modelingSubmission.explanationText = this.explanationText;
         modelingSubmission.exampleSubmission = true;
 
         const newExampleSubmission: ExampleSubmission = this.exampleSubmission;
@@ -151,6 +156,8 @@ export class ExampleModelingSubmissionComponent implements OnInit {
                     if (this.modelingSubmission.model) {
                         this.umlModel = JSON.parse(this.modelingSubmission.model);
                     }
+                    // Updates the explanation text with example modeling submission's explanation
+                    this.explanationText = this.modelingSubmission.explanationText ?? '';
                 }
                 this.isNewSubmission = false;
 
@@ -171,6 +178,7 @@ export class ExampleModelingSubmissionComponent implements OnInit {
             this.createNewExampleModelingSubmission();
         }
         this.modelingSubmission.model = JSON.stringify(this.modelingEditor.getCurrentModel());
+        this.modelingSubmission.explanationText = this.explanationText;
         this.modelingSubmission.exampleSubmission = true;
         if (this.result) {
             this.result.feedbacks = this.feedbacks;
@@ -190,6 +198,9 @@ export class ExampleModelingSubmissionComponent implements OnInit {
                     this.modelingSubmission = this.exampleSubmission.submission as ModelingSubmission;
                     if (this.modelingSubmission.model) {
                         this.umlModel = JSON.parse(this.modelingSubmission.model);
+                    }
+                    if (this.modelingSubmission.explanationText) {
+                        this.explanationText = this.modelingSubmission.explanationText;
                     }
                 }
                 this.isNewSubmission = false;
@@ -217,6 +228,10 @@ export class ExampleModelingSubmissionComponent implements OnInit {
 
     private modelChanged(): boolean {
         return this.modelingEditor && JSON.stringify(this.umlModel) !== JSON.stringify(this.modelingEditor.getCurrentModel());
+    }
+
+    explanationChanged(explanation: string) {
+        this.explanationText = explanation;
     }
 
     showSubmission() {
@@ -313,7 +328,9 @@ export class ExampleModelingSubmissionComponent implements OnInit {
             return;
         }
 
-        this.totalScore = credits.reduce((a, b) => a! + b!, 0)!;
+        const maxPoints = this.exercise.maxScore! + this.exercise.bonusPoints!;
+        const creditsTotalScore = credits.reduce((a, b) => a! + b!, 0)!;
+        this.totalScore = getPositiveAndCappedTotalScore(creditsTotalScore, maxPoints);
         this.assessmentsAreValid = true;
         this.invalidError = undefined;
     }

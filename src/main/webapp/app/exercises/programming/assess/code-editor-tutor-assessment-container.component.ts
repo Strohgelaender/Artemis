@@ -8,7 +8,7 @@ import { JhiAlertService } from 'ng-jhipster';
 import { ProgrammingExerciseParticipationService } from 'app/exercises/programming/manage/services/programming-exercise-participation.service';
 import { ButtonSize } from 'app/shared/components/button.component';
 import { DomainService } from 'app/exercises/programming/shared/code-editor/service/code-editor-domain.service';
-import { ExerciseType } from 'app/entities/exercise.model';
+import { ExerciseType, IncludedInOverallScore } from 'app/entities/exercise.model';
 import { Result } from 'app/entities/result.model';
 import { ProgrammingExercise } from 'app/entities/programming-exercise.model';
 import { DomainType } from 'app/exercises/programming/shared/code-editor/model/code-editor.model';
@@ -29,6 +29,12 @@ import { Course } from 'app/entities/course.model';
 import { Feedback, FeedbackType } from 'app/entities/feedback.model';
 import { Authority } from 'app/shared/constants/authority.constants';
 import { StructuredGradingCriterionService } from 'app/exercises/shared/structured-grading-criterion/structured-grading-criterion.service';
+import { switchMap, tap } from 'rxjs/operators';
+import { CodeEditorRepositoryFileService } from 'app/exercises/programming/shared/code-editor/service/code-editor-repository.service';
+import { diff_match_patch } from 'diff-match-patch';
+import { ProgrammingExerciseService } from 'app/exercises/programming/manage/services/programming-exercise.service';
+import { TemplateProgrammingExerciseParticipation } from 'app/entities/participation/template-programming-exercise-participation.model';
+import { getPositiveAndCappedTotalScore } from 'app/exercises/shared/exercise/exercise-utils';
 
 @Component({
     selector: 'jhi-code-editor-tutor-assessment',
@@ -38,6 +44,9 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
     @ViewChild(CodeEditorContainerComponent, { static: false }) codeEditorContainer: CodeEditorContainerComponent;
     ButtonSize = ButtonSize;
     PROGRAMMING = ExerciseType.PROGRAMMING;
+
+    readonly dmp = new diff_match_patch();
+    readonly IncludedInOverallScore = IncludedInOverallScore;
 
     paramSub: Subscription;
     participation: ProgrammingExerciseStudentParticipation;
@@ -63,6 +72,7 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
     showEditorInstructions = true;
     hasAssessmentDueDatePassed: boolean;
     adjustedRepositoryURL: string;
+    correctionRound: number;
 
     private get course(): Course | undefined {
         return this.exercise?.course || this.exercise?.exerciseGroup?.exam?.course;
@@ -75,6 +85,9 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
 
     isFirstAssessment = false;
     lockLimitReached = false;
+
+    templateParticipation: TemplateProgrammingExerciseParticipation;
+    templateFileSession: { [fileName: string]: string } = {};
 
     constructor(
         private manualResultService: ProgrammingAssessmentManualResultService,
@@ -89,6 +102,8 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
         private route: ActivatedRoute,
         private jhiAlertService: JhiAlertService,
         private structuredGradingCriterionService: StructuredGradingCriterionService,
+        private repositoryFileService: CodeEditorRepositoryFileService,
+        private programmingExerciseService: ProgrammingExerciseService,
     ) {
         translateService.get('artemisApp.assessment.messages.confirmCancel').subscribe((text) => (this.cancelConfirmationText = text));
     }
@@ -104,6 +119,7 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
         });
         this.route.queryParamMap.subscribe((queryParams) => {
             this.isTestRun = queryParams.get('testRun') === 'true';
+            this.correctionRound = Number(queryParams.get('correction-round'));
         });
         this.isAtLeastInstructor = this.accountService.hasAnyAuthorityDirect([Authority.ADMIN, Authority.INSTRUCTOR]);
         this.paramSub = this.route.params.subscribe((params) => {
@@ -122,7 +138,7 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
                     this.onError('artemisApp.exerciseAssessmentDashboard.noSubmissions');
                     return;
                 } else if (response?.error) {
-                    this.onError(response?.error);
+                    this.onError(response?.error?.detail || 'Not Found');
                     return;
                 }
                 participationId = Number(response);
@@ -133,37 +149,55 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
                 participationId = Number(params['participationId']);
             }
 
-            this.programmingExerciseParticipationService.getStudentParticipationWithLatestManualResult(participationId).subscribe(
-                (participationWithResult: ProgrammingExerciseStudentParticipation) => {
-                    // Set domain to make file editor work properly
-                    this.domainService.setDomain([DomainType.PARTICIPATION, participationWithResult]);
-                    this.participation = participationWithResult;
-                    this.manualResult = this.participation.results![0];
+            this.programmingExerciseParticipationService
+                .getStudentParticipationWithLatestManualResult(participationId)
+                .pipe(
+                    tap(
+                        (participationWithResult: ProgrammingExerciseStudentParticipation) => {
+                            // Set domain to make file editor work properly
+                            this.domainService.setDomain([DomainType.PARTICIPATION, participationWithResult]);
+                            this.participation = participationWithResult;
+                            this.manualResult = this.participation.results![0];
 
-                    // Either submission from latest manual or automatic result
-                    this.submission = this.manualResult.submission as ProgrammingSubmission;
-                    this.submission.participation = this.participation;
-                    this.exercise = this.participation.exercise as ProgrammingExercise;
-                    this.hasAssessmentDueDatePassed = !!this.exercise!.assessmentDueDate && moment(this.exercise!.assessmentDueDate).isBefore(now());
+                            // Either submission from latest manual or automatic result
+                            this.submission = this.manualResult.submission as ProgrammingSubmission;
+                            this.submission.participation = this.participation;
+                            this.exercise = this.participation.exercise as ProgrammingExercise;
+                            this.hasAssessmentDueDatePassed = !!this.exercise!.assessmentDueDate && moment(this.exercise!.assessmentDueDate).isBefore(now());
 
-                    this.checkPermissions();
-                    this.handleFeedback();
+                            this.checkPermissions();
+                            this.handleFeedback();
 
-                    if (this.manualResult && this.manualResult.hasComplaint) {
-                        this.getComplaint();
-                    }
-                    this.createAdjustedRepositoryUrl();
-                },
-                (error: HttpErrorResponse) => {
-                    this.participationCouldNotBeFetched = true;
-                    if (error.error && error.error.errorKey === 'lockedSubmissionsLimitReached') {
-                        this.lockLimitReached = true;
-                    }
-                },
-                () => {
-                    this.loadingParticipation = false;
-                },
-            );
+                            if (this.manualResult && this.manualResult.hasComplaint) {
+                                this.getComplaint();
+                            }
+                            this.createAdjustedRepositoryUrl();
+                        },
+                        (error: HttpErrorResponse) => {
+                            this.participationCouldNotBeFetched = true;
+                            if (error.error && error.error.errorKey === 'lockedSubmissionsLimitReached') {
+                                this.lockLimitReached = true;
+                            }
+                        },
+                        () => (this.loadingParticipation = false),
+                    ),
+                    switchMap(() => this.programmingExerciseService.findWithTemplateAndSolutionParticipation(this.exercise.id!)),
+                    tap((programmingExercise) => (this.templateParticipation = programmingExercise.body!.templateParticipation!)),
+                    switchMap(() => {
+                        // Get all files with content from template repository
+                        this.domainService.setDomain([DomainType.PARTICIPATION, this.templateParticipation]);
+                        const observable = this.repositoryFileService.getFilesWithContent();
+                        // Set back to student participation
+                        this.domainService.setDomain([DomainType.PARTICIPATION, this.participation]);
+                        return observable;
+                    }),
+                    tap((templateFilesObj) => {
+                        if (templateFilesObj) {
+                            this.templateFileSession = templateFilesObj;
+                        }
+                    }),
+                )
+                .subscribe();
         });
     }
 
@@ -177,12 +211,62 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
     }
 
     /**
+     * Triggers when a new file was selected in the code editor. Compares the content of the file with the template (if available), calculates the diff
+     * and highlights the changed/added lines or all lines if the file is not in the template.
+     *
+     * @param selectedFile name of the file which is currently displayed
+     */
+    onFileLoad(selectedFile: string): void {
+        if (selectedFile && this.codeEditorContainer?.selectedFile) {
+            // When the selectedFile is not part of the template, then this is a new file and all lines in code editor are highlighted
+            if (!this.templateFileSession[selectedFile]) {
+                const lastLine = this.codeEditorContainer.aceEditor.editorSession.getLength() - 1;
+                this.codeEditorContainer.aceEditor.markerIds.push(
+                    this.codeEditorContainer.aceEditor.editorSession.addMarker(new this.codeEditorContainer.aceEditor.Range(0, 0, lastLine, 1), 'diff-newLine', 'fullLine'),
+                );
+            } else {
+                // Calculation of the diff, see: https://github.com/google/diff-match-patch/wiki/Line-or-Word-Diffs
+                const diffArray = this.dmp.diff_linesToChars_(this.templateFileSession[selectedFile], this.codeEditorContainer.aceEditor.editorSession.getValue());
+                const lineText1 = diffArray.chars1;
+                const lineText2 = diffArray.chars2;
+                const lineArray = diffArray.lineArray;
+                const diffs = this.dmp.diff_main(lineText1, lineText2, false);
+                this.dmp.diff_charsToLines_(diffs, lineArray);
+
+                // Setup counter to know on which range to highlight in the code editor
+                let counter = 0;
+                diffs.forEach((diffElement) => {
+                    // No changes
+                    if (diffElement[0] === 0) {
+                        const lines = diffElement[1].split(/\r?\n/);
+                        counter += lines.length - 1;
+                    }
+                    // Newly added
+                    if (diffElement[0] === 1) {
+                        const lines = diffElement[1].split(/\r?\n/).filter(Boolean);
+                        const firstLineToHighlight = counter;
+                        const lastLineToHighlight = counter + lines.length - 1;
+                        this.codeEditorContainer.aceEditor.markerIds.push(
+                            this.codeEditorContainer.aceEditor.editorSession.addMarker(
+                                new this.codeEditorContainer.aceEditor.Range(firstLineToHighlight, 0, lastLineToHighlight, 1),
+                                'diff-newLine',
+                                'fullLine',
+                            ),
+                        );
+                        counter += lines.length;
+                    }
+                });
+            }
+        }
+    }
+
+    /**
      * Save the assessment
      */
     save(): void {
         this.saveBusy = true;
         this.avoidCircularStructure();
-        this.manualResultService.save(this.participation.id!, this.manualResult!).subscribe(
+        this.manualResultService.saveAssessment(this.participation.id!, this.manualResult!, undefined, this.correctionRound).subscribe(
             (response) => this.handleSaveOrSubmitSuccessWithAlert(response, 'artemisApp.textAssessment.saveSuccessful'),
             (error: HttpErrorResponse) => this.onError(`error.${error?.error?.errorKey}`),
         );
@@ -194,7 +278,7 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
     submit(): void {
         this.submitBusy = true;
         this.avoidCircularStructure();
-        this.manualResultService.save(this.participation.id!, this.manualResult!, true).subscribe(
+        this.manualResultService.saveAssessment(this.participation.id!, this.manualResult!, true, this.correctionRound).subscribe(
             (response) => this.handleSaveOrSubmitSuccessWithAlert(response, 'artemisApp.textAssessment.submitSuccessful'),
             (error: HttpErrorResponse) => this.onError(`error.${error?.error?.errorKey}`),
         );
@@ -216,15 +300,14 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
      * Go to next submission
      */
     nextSubmission() {
-        this.programmingSubmissionService.getProgrammingSubmissionForExerciseWithoutAssessment(this.exercise.id!, true).subscribe(
+        this.programmingSubmissionService.getProgrammingSubmissionForExerciseForCorrectionRoundWithoutAssessment(this.exercise.id!, true, this.correctionRound).subscribe(
             (response: ProgrammingSubmission) => {
                 const unassessedSubmission = response;
                 this.router.onSameUrlNavigation = 'reload';
                 // navigate to the new assessment page to trigger re-initialization of the components
-                this.router.navigateByUrl(
-                    `/course-management/${this.course!.id}/programming-exercises/${this.exercise.id}/code-editor/${unassessedSubmission.participation?.id}/assessment`,
-                    {},
-                );
+                let url = `/course-management/${this.course!.id}/programming-exercises/${this.exercise.id}/code-editor/${unassessedSubmission.participation?.id}/assessment`;
+                url += `?correction-round=${this.correctionRound}`;
+                this.router.navigateByUrl(url, {});
             },
             (error: HttpErrorResponse) => {
                 if (error.status === 404) {
@@ -254,9 +337,14 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
                 this.jhiAlertService.clear();
                 this.jhiAlertService.success('artemisApp.assessment.messages.updateAfterComplaintSuccessful');
             },
-            () => {
+            (httpErrorResponse: HttpErrorResponse) => {
                 this.jhiAlertService.clear();
-                this.onError('artemisApp.assessment.messages.updateAfterComplaintFailed');
+                const error = httpErrorResponse.error;
+                if (error && error.errorKey && error.errorKey === 'complaintLock') {
+                    this.jhiAlertService.error(error.message, error.params);
+                } else {
+                    this.onError('artemisApp.assessment.messages.updateAfterComplaintFailed');
+                }
             },
         );
     }
@@ -321,8 +409,8 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
      */
     validateFeedback(): void {
         this.calculateTotalScore();
-        const hasReferencedFeedback = Feedback.areValid(this.referencedFeedback);
-        const hasUnreferencedFeedback = Feedback.areValid(this.unreferencedFeedback);
+        const hasReferencedFeedback = Feedback.haveCreditsAndComments(this.referencedFeedback);
+        const hasUnreferencedFeedback = Feedback.haveCreditsAndComments(this.unreferencedFeedback);
         const hasGeneralFeedback = Feedback.hasDetailText(this.generalFeedback);
         // When unreferenced feedback is set, it has to be valid (score + detailed text)
         this.assessmentsAreValid = ((hasReferencedFeedback || hasGeneralFeedback) && this.unreferencedFeedback.length === 0) || hasUnreferencedFeedback;
@@ -415,6 +503,10 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
         }
     }
 
+    private createResultString(totalScore: number, maxScore: number | undefined): string {
+        return `${totalScore} of ${maxScore} points`;
+    }
+
     private setAttributesForManualResult(totalScore: number) {
         this.setFeedbacksForManualResult();
         // Manual result is always rated and has feedback
@@ -422,19 +514,18 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
         this.manualResult!.hasFeedback = true;
         // Append the automatic result string which the manual result holds with the score part, to create the manual result string
         if (this.isFirstAssessment) {
-            this.manualResult!.resultString += this.exercise.maxScore ? `, ${totalScore} of ${this.exercise.maxScore} points` : `, ${totalScore} points`;
+            this.manualResult!.resultString += ', ' + this.createResultString(totalScore, this.exercise.maxScore);
             this.isFirstAssessment = false;
         } else {
             /* Result string has following structure e.g: "1 of 13 passed, 2 issues, 10 of 100 points" The last part of the result string has to be updated,
              * as the points the student has achieved have changed
              */
             const resultStringParts: string[] = this.manualResult!.resultString!.split(', ');
-            // When no maxScore is set, then show only the achieved points
-            resultStringParts[resultStringParts.length - 1] = this.exercise.maxScore ? `${totalScore} of ${this.exercise.maxScore} points` : `${totalScore} points`;
+            resultStringParts[resultStringParts.length - 1] = this.createResultString(totalScore, this.exercise.maxScore);
             this.manualResult!.resultString = resultStringParts.join(', ');
         }
 
-        this.manualResult!.score = this.exercise.maxScore ? Math.round((totalScore / this.exercise.maxScore!) * 100) : 100;
+        this.manualResult!.score = Math.round((totalScore / this.exercise.maxScore!) * 100);
         // This is done to update the result string in result.component.ts
         this.manualResult = cloneDeep(this.manualResult);
     }
@@ -473,16 +564,7 @@ export class CodeEditorTutorAssessmentContainerComponent implements OnInit, OnDe
             scoreAutomaticTests = maxPoints;
         }
         totalScore += scoreAutomaticTests;
-        // Do not allow negative score
-        if (totalScore < 0) {
-            totalScore = 0;
-        }
-        // Cap totalScore to maxPoints
-        if (totalScore > maxPoints) {
-            totalScore = maxPoints;
-        }
-
-        totalScore = +totalScore.toFixed(2);
+        totalScore = getPositiveAndCappedTotalScore(totalScore, maxPoints);
 
         // Set attributes of manual result
         this.setAttributesForManualResult(totalScore);

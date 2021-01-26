@@ -15,11 +15,15 @@ import javax.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.audit.AuditEvent;
+import org.springframework.boot.actuate.audit.AuditEventRepository;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import de.tum.in.www1.artemis.config.Constants;
 import de.tum.in.www1.artemis.domain.*;
+import de.tum.in.www1.artemis.domain.enumeration.IncludedInOverallScore;
 import de.tum.in.www1.artemis.domain.enumeration.InitializationState;
 import de.tum.in.www1.artemis.domain.enumeration.SubmissionType;
 import de.tum.in.www1.artemis.domain.exam.Exam;
@@ -50,6 +54,8 @@ public class ExamService {
 
     private CourseService courseService;
 
+    private StudentExamService studentExamService;
+
     private final UserService userService;
 
     private final ExamRepository examRepository;
@@ -68,9 +74,11 @@ public class ExamService {
 
     private final InstanceMessageSendService instanceMessageSendService;
 
+    private final AuditEventRepository auditEventRepository;
+
     public ExamService(ExamRepository examRepository, StudentExamRepository studentExamRepository, UserService userService, ParticipationService participationService,
             ProgrammingExerciseService programmingExerciseService, ExamQuizService examQuizService, ExerciseService exerciseService,
-            InstanceMessageSendService instanceMessageSendService, QuizExerciseService quizExerciseService) {
+            InstanceMessageSendService instanceMessageSendService, QuizExerciseService quizExerciseService, AuditEventRepository auditEventRepository) {
         this.examRepository = examRepository;
         this.studentExamRepository = studentExamRepository;
         this.userService = userService;
@@ -80,12 +88,19 @@ public class ExamService {
         this.instanceMessageSendService = instanceMessageSendService;
         this.exerciseService = exerciseService;
         this.quizExerciseService = quizExerciseService;
+        this.auditEventRepository = auditEventRepository;
     }
 
     @Autowired
     // break the dependency cycle
     public void setCourseService(CourseService courseService) {
         this.courseService = courseService;
+    }
+
+    @Autowired
+    // break the dependency cycle
+    public void setStudentExamService(StudentExamService studentExamService) {
+        this.studentExamService = studentExamService;
     }
 
     /**
@@ -209,18 +224,25 @@ public class ExamService {
     }
 
     /**
-     * Deletes all elements associated with the exam including:
+     * Fetches the exam using {@link #findOneWithExercisesGroupsAndStudentExamsByExamId} which eagerly loads all required elements and deletes all elements associated with the
+     * exam including:
      * <ul>
      *     <li>The Exam</li>
      *     <li>All ExerciseGroups</li>
      *     <li>All Exercises including:
-     *     Submissions, Participations, Results, Repositories and Buildplans, see {@link ExerciseService#delete}</li>
+     *     Submissions, Participations, Results, Repositories and build plans, see {@link ExerciseService#delete}</li>
      *     <li>All StudentExams</li>
      * </ul>
      * Note: StudentExams and ExerciseGroups are not explicitly deleted as the delete operation of the exam is cascaded by the database.
-     * @param exam the exam to be deleted
+     * @param examId the ID of the exam to be deleted
      */
-    public void delete(@NotNull Exam exam) {
+    public void delete(@NotNull long examId) {
+        User user = userService.getUser();
+        Exam exam = findOneWithExercisesGroupsAndStudentExamsByExamId(examId);
+        log.info("User " + user.getLogin() + " has requested to delete the exam {}", exam.getTitle());
+        AuditEvent auditEvent = new AuditEvent(user.getLogin(), Constants.DELETE_EXAM, "exam=" + exam.getTitle());
+        auditEventRepository.add(auditEvent);
+
         for (ExerciseGroup exerciseGroup : exam.getExerciseGroups()) {
             if (exerciseGroup != null) {
                 for (Exercise exercise : exerciseGroup.getExercises()) {
@@ -229,16 +251,6 @@ public class ExamService {
             }
         }
         examRepository.deleteById(exam.getId());
-    }
-
-    /**
-     * Fetches the exam using {@link #findOneWithExercisesGroupsAndStudentExamsByExamId} which eagerly loads all required elements and calls {@link #delete}
-     *
-     * @param examId the ID of the exam to be deleted
-     */
-    public void deleteById(Long examId) {
-        Exam exam = this.findOneWithExercisesGroupsAndStudentExamsByExamId(examId);
-        this.delete(exam);
     }
 
     /**
@@ -295,7 +307,7 @@ public class ExamService {
         }
 
         // Adding registered student information to DTO
-        List<StudentExam> studentExams = studentExamRepository.findByExamId(examId);
+        Set<StudentExam> studentExams = studentExamRepository.findByExamId(examId);
         ObjectMapper objectMapper = new ObjectMapper();
         for (StudentExam studentExam : studentExams) {
             User user = studentExam.getUser();
@@ -314,7 +326,11 @@ public class ExamService {
                 if (studentParticipation.getResults() != null && !studentParticipation.getResults().isEmpty()) {
                     Result relevantResult = studentParticipation.getResults().iterator().next();
                     double achievedPoints = relevantResult.getScore() / 100.0 * exercise.getMaxScore();
-                    studentResult.overallPointsAchieved += Math.round(achievedPoints * 10) / 10.0;
+
+                    // points earned in NOT_INCLUDED exercises do not count towards the students result in the exam
+                    if (!exercise.getIncludedInOverallScore().equals(IncludedInOverallScore.NOT_INCLUDED)) {
+                        studentResult.overallPointsAchieved += Math.round(achievedPoints * 10) / 10.0;
+                    }
 
                     // Check whether the student attempted to solve the exercise
                     boolean hasNonEmptySubmission = hasNonEmptySubmission(studentParticipation.getSubmissions(), exercise, objectMapper);
@@ -331,7 +347,7 @@ public class ExamService {
         }
 
         // Updating exam information in DTO
-        Double sumOverallPoints = scores.studentResults.stream().mapToDouble(studentResult -> studentResult.overallPointsAchieved).sum();
+        double sumOverallPoints = scores.studentResults.stream().mapToDouble(studentResult -> studentResult.overallPointsAchieved).sum();
 
         int numberOfStudentResults = scores.studentResults.size();
 
@@ -384,33 +400,21 @@ public class ExamService {
     /**
      * Generates the student exams randomly based on the exam configuration and the exercise groups
      *
-     * @param examId the id of the exam
+     * @param examWithRegisteredUsersAndExerciseGroupsAndExercises the exam with registered users, exerciseGroups and exercises loaded
      * @return the list of student exams with their corresponding users
      */
-    public List<StudentExam> generateStudentExams(Long examId) {
-        // Delete all existing student exams via orphan removal (ignore test runs)
-        Exam examWithExistingStudentExams = findWithStudentExamsById(examId);
-
-        // TODO: the validation checks should happen in the resource, before this method is even being called!
-        if (examWithExistingStudentExams.getNumberOfExercisesInExam() == null) {
-            throw new BadRequestAlertException("The number of exercises must be set for the exam", "Exam", "artemisApp.exam.validation.numberOfExercisesMustBeSet");
-        }
-
+    public List<StudentExam> generateStudentExams(final Exam examWithRegisteredUsersAndExerciseGroupsAndExercises) {
+        final var examWithExistingStudentExams = findWithStudentExams(examWithRegisteredUsersAndExerciseGroupsAndExercises.getId());
         // https://jira.spring.io/browse/DATAJPA-1367 deleteInBatch does not work, because it does not cascade the deletion of existing exam sessions, therefore use deleteAll
         studentExamRepository.deleteAll(examWithExistingStudentExams.getStudentExams());
 
-        // now fetch the exam with additional information
-        Exam exam = examRepository.findWithRegisteredUsersAndExerciseGroupsAndExercisesById(examId).get();
-
-        List<ExerciseGroup> exerciseGroups = exam.getExerciseGroups();
-        long numberOfOptionalExercises = exam.getNumberOfExercisesInExam() - exerciseGroups.stream().filter(ExerciseGroup::getIsMandatory).count();
-
-        // Validate settings of the exam
-        validateStudentExamGeneration(exam, numberOfOptionalExercises);
+        List<ExerciseGroup> exerciseGroups = examWithRegisteredUsersAndExerciseGroupsAndExercises.getExerciseGroups();
+        long numberOfOptionalExercises = examWithRegisteredUsersAndExerciseGroupsAndExercises.getNumberOfExercisesInExam()
+                - exerciseGroups.stream().filter(ExerciseGroup::getIsMandatory).count();
 
         // StudentExams are saved in the called method
-        List<StudentExam> studentExams = createRandomStudentExams(exam, exam.getRegisteredUsers(), numberOfOptionalExercises);
-        return studentExams;
+        return createRandomStudentExams(examWithRegisteredUsersAndExerciseGroupsAndExercises, examWithRegisteredUsersAndExerciseGroupsAndExercises.getRegisteredUsers(),
+                numberOfOptionalExercises);
     }
 
     /**
@@ -418,48 +422,38 @@ public class ExamService {
      * The difference between all registered users and the users who already have an individual exam
      * is the set of users for which student exams will be created.
      *
-     * @param examId        the id of the exam
+     * @param examWithRegisteredUsersAndExerciseGroupsAndExercises exam with registered users, exerciseGroups, and Exercises loaded
      * @return the list of student exams with their corresponding users
      */
-    public List<StudentExam> generateMissingStudentExams(Long examId) {
-        Exam exam = examRepository.findWithRegisteredUsersAndExerciseGroupsAndExercisesById(examId).get();
-
-        // TODO: the validation checks should happen in the resource, before this method is even being called!
-        if (exam.getNumberOfExercisesInExam() == null) {
-            throw new BadRequestAlertException("The number of exercises must be set for the exam", "Exam", "artemisApp.exam.validation.numberOfExercisesMustBeSet");
-        }
-
-        long numberOfOptionalExercises = exam.getNumberOfExercisesInExam() - exam.getExerciseGroups().stream().filter(ExerciseGroup::getIsMandatory).count();
-
-        // Validate settings of the exam
-        validateStudentExamGeneration(exam, numberOfOptionalExercises);
+    public List<StudentExam> generateMissingStudentExams(Exam examWithRegisteredUsersAndExerciseGroupsAndExercises) {
+        long numberOfOptionalExercises = examWithRegisteredUsersAndExerciseGroupsAndExercises.getNumberOfExercisesInExam()
+                - examWithRegisteredUsersAndExerciseGroupsAndExercises.getExerciseGroups().stream().filter(ExerciseGroup::getIsMandatory).count();
 
         // Get all users who already have an individual exam
-        Set<User> usersWithStudentExam = studentExamRepository.findUsersWithStudentExamsForExam(examId);
+        Set<User> usersWithStudentExam = studentExamRepository.findUsersWithStudentExamsForExam(examWithRegisteredUsersAndExerciseGroupsAndExercises.getId());
 
         // Get all registered users
-        Set<User> allRegisteredUsers = exam.getRegisteredUsers();
+        Set<User> allRegisteredUsers = examWithRegisteredUsersAndExerciseGroupsAndExercises.getRegisteredUsers();
 
         // Get all students who don't have an exam yet
         Set<User> missingUsers = new HashSet<>(allRegisteredUsers);
         missingUsers.removeAll(usersWithStudentExam);
 
         // StudentExams are saved in the called method
-        List<StudentExam> missingStudentExams = createRandomStudentExams(exam, missingUsers, numberOfOptionalExercises);
-
-        // TODO: make sure the student exams still contain non proxy users
-
-        return missingStudentExams;
+        return createRandomStudentExams(examWithRegisteredUsersAndExerciseGroupsAndExercises, missingUsers, numberOfOptionalExercises);
     }
 
     /**
      * Validates exercise settings.
      *
      * @param exam exam which is validated
-     * @param numberOfOptionalExercises number of optional exercises in the exam
      * @throws BadRequestAlertException
      */
-    private void validateStudentExamGeneration(Exam exam, long numberOfOptionalExercises) throws BadRequestAlertException {
+    public void validateForStudentExamGeneration(Exam exam) throws BadRequestAlertException {
+        List<ExerciseGroup> exerciseGroups = exam.getExerciseGroups();
+        long numberOfExercises = exam.getNumberOfExercisesInExam() != null ? exam.getNumberOfExercisesInExam() : 0;
+        long numberOfOptionalExercises = numberOfExercises - exerciseGroups.stream().filter(ExerciseGroup::getIsMandatory).count();
+
         // Check that the start and end date of the exam is set
         if (exam.getStartDate() == null || exam.getEndDate() == null) {
             throw new BadRequestAlertException("The start and end date must be set for the exam", "Exam", "artemisApp.exam.validation.startAndEndMustBeSet");
@@ -485,6 +479,61 @@ public class ExamService {
         // Check that there are not too much mandatory exercise groups
         if (numberOfOptionalExercises < 0) {
             throw new BadRequestAlertException("The number of mandatory exercise groups is too large", "Exam", "artemisApp.exam.validation.tooManyMandatoryExerciseGroups");
+        }
+
+        // Ensure that all exercises in an exercise group have the same meaning for the exam score calculation
+        for (ExerciseGroup exerciseGroup : exam.getExerciseGroups()) {
+            Set<IncludedInOverallScore> meaningsForScoreCalculation = exerciseGroup.getExercises().stream().map(exercise -> exercise.getIncludedInOverallScore())
+                    .collect(Collectors.toSet());
+            if (meaningsForScoreCalculation.size() > 1) {
+                throw new BadRequestAlertException("All exercises in an exercise group must have the same meaning for the exam score", "Exam",
+                        "artemisApp.exam.validation.allExercisesInExerciseGroupOfSameIncludedType");
+            }
+        }
+
+        // Check that the exam max points is set
+        if (exam.getMaxPoints() == null) {
+            throw new BadRequestAlertException("The exam max points is not set.", "Exam", "artemisApp.exam.validation.maxPointsNotSet");
+        }
+
+        // Ensure that all exercises in an exercise group have the same amount of max points and max bonus points
+        for (ExerciseGroup exerciseGroup : exam.getExerciseGroups()) {
+            Set<Double> maxPointsEarnable = exerciseGroup.getExercises().stream().map(Exercise::getMaxScore).collect(Collectors.toSet());
+            Set<Double> bonusPointsEarnable = exerciseGroup.getExercises().stream().map(Exercise::getBonusPoints).collect(Collectors.toSet());
+
+            if (maxPointsEarnable.size() > 1 || bonusPointsEarnable.size() > 1) {
+                throw new BadRequestAlertException("All exercises in an exercise group need to give the same amount of points", "Exam",
+                        "artemisApp.exam.validation.allExercisesInExerciseGroupGiveSameNumberOfPoints");
+            }
+        }
+
+        // Ensure that the sum of all max points of mandatory exercise groups is not bigger than the max points set in the exam
+        // At this point we are already sure that each exercise group has at least one exercise, all exercises in the group have the same no of points
+        // and all are of the same calculation type, therefore we can just use any as representation for the group here
+        Double pointsReachableByMandatoryExercises = 0.0;
+        Set<ExerciseGroup> mandatoryExerciseGroups = exam.getExerciseGroups().stream().filter(ExerciseGroup::getIsMandatory).collect(Collectors.toSet());
+        for (ExerciseGroup exerciseGroup : mandatoryExerciseGroups) {
+            Exercise groupRepresentativeExercise = exerciseGroup.getExercises().stream().findAny().get();
+            if (groupRepresentativeExercise.getIncludedInOverallScore().equals(IncludedInOverallScore.INCLUDED_COMPLETELY)) {
+                pointsReachableByMandatoryExercises += groupRepresentativeExercise.getMaxScore();
+            }
+        }
+        if (pointsReachableByMandatoryExercises > exam.getMaxPoints()) {
+            throw new BadRequestAlertException("Check that you set the exam max points correctly! The max points a student can earn in the mandatory exercise groups is too big",
+                    "Exam", "artemisApp.exam.validation.tooManyMaxPoints");
+        }
+
+        // Ensure that the sum of all max points of all exercise groups is at least as big as the max points set in the exam
+        Double pointsReachable = 0.0;
+        for (ExerciseGroup exerciseGroup : exam.getExerciseGroups()) {
+            Exercise groupRepresentativeExercise = exerciseGroup.getExercises().stream().findAny().get();
+            if (groupRepresentativeExercise.getIncludedInOverallScore().equals(IncludedInOverallScore.INCLUDED_COMPLETELY)) {
+                pointsReachable += groupRepresentativeExercise.getMaxScore();
+            }
+        }
+        if (pointsReachable < exam.getMaxPoints()) {
+            throw new BadRequestAlertException("Check that you set the exam max points correctly! The max points a student can earn in the exercise groups is too low", "Exam",
+                    "artemisApp.exam.validation.tooFewMaxPoints");
         }
     }
 
@@ -561,19 +610,23 @@ public class ExamService {
         List<StudentDTO> notFoundStudentsDtos = new ArrayList<>();
         for (var studentDto : studentDtos) {
             var registrationNumber = studentDto.getRegistrationNumber();
+            var login = studentDto.getLogin();
             try {
                 // 1) we use the registration number and try to find the student in the Artemis user database
-                Optional<User> optionalStudent = userService.findUserWithGroupsAndAuthoritiesByRegistrationNumber(registrationNumber);
+                var optionalStudent = userService.findUserWithGroupsAndAuthoritiesByRegistrationNumber(registrationNumber);
                 if (optionalStudent.isPresent()) {
                     var student = optionalStudent.get();
-                    // we only need to add the student to the course group, if the student is not yet part of it, otherwise the student cannot access the exam (within the course)
+                    // we only need to add the student to the course group, if the student is not yet part of it, otherwise the student cannot access the exam (within the
+                    // course)
                     if (!student.getGroups().contains(course.getStudentGroupName())) {
                         userService.addUserToGroup(student, course.getStudentGroupName());
                     }
                     exam.addRegisteredUser(student);
                     continue;
                 }
-                // 2) if we cannot find the student, we use the registration number and try to find the student in the (TUM) LDAP, create it in the Artemis DB and in a potential
+
+                // 2) if we cannot find the student, we use the registration number and try to find the student in the (TUM) LDAP, create it in the Artemis DB and in a
+                // potential
                 // external user management system
                 optionalStudent = userService.createUserFromLdap(registrationNumber);
                 if (optionalStudent.isPresent()) {
@@ -583,8 +636,18 @@ public class ExamService {
                     exam.addRegisteredUser(student);
                     continue;
                 }
-                // 3) if we cannot find the user in the (TUM) LDAP, we report this to the client
-                log.warn("User with registration number " + registrationNumber + " not found in Artemis user database and not found in (TUM) LDAP");
+
+                // 3) if we cannot find the user in the (TUM) LDAP or the registration number was not set properly, try again using the login
+                optionalStudent = userService.findUserWithGroupsAndAuthoritiesByLogin(login);
+                if (optionalStudent.isPresent()) {
+                    var student = optionalStudent.get();
+                    // the newly created student needs to get the rights to access the course, otherwise the student cannot access the exam (within the course)
+                    userService.addUserToGroup(student, course.getStudentGroupName());
+                    exam.addRegisteredUser(student);
+                    continue;
+                }
+
+                log.warn("User with registration number '" + registrationNumber + "' and login '" + login + "' not found in Artemis user database nor found in (TUM) LDAP");
             }
             catch (Exception ex) {
                 log.warn("Error while processing user with registration number " + registrationNumber + ": " + ex.getMessage(), ex);
@@ -593,6 +656,22 @@ public class ExamService {
             notFoundStudentsDtos.add(studentDto);
         }
         examRepository.save(exam);
+
+        try {
+            User currentUser = userService.getUserWithGroupsAndAuthorities();
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("exam", exam.getTitle());
+            for (var studentDto : studentDtos) {
+                userData.put("student", studentDto.getFirstName() + " " + studentDto.getLastName() + ", " + studentDto.getRegistrationNumber());
+            }
+            AuditEvent auditEvent = new AuditEvent(currentUser.getLogin(), Constants.ADD_USER_TO_EXAM, userData);
+            auditEventRepository.add(auditEvent);
+            log.info("User " + currentUser.getLogin() + " has added multiple users " + studentDtos + " to the exam " + exam.getTitle() + " with id " + exam.getId());
+        }
+        catch (Exception ex) {
+            log.warn("Could not add audit event to audit log", ex);
+        }
+
         return notFoundStudentsDtos;
     }
 
@@ -613,10 +692,10 @@ public class ExamService {
      * @param examId the id of the exam
      * @return the exam with student exams loaded
      */
-    private Exam findWithStudentExamsById(long examId) {
+    public Exam findWithStudentExams(long examId) {
         Exam exam = examRepository.findWithStudentExamsById(examId).orElseThrow(() -> new EntityNotFoundException("Exam with id " + examId + " does not exist"));
         // drop all test runs and set the remaining student exams to the exam
-        exam.setStudentExams(exam.getStudentExams().stream().dropWhile(StudentExam::getTestRun).collect(Collectors.toSet()));
+        exam.setStudentExams(exam.getStudentExams().stream().dropWhile(StudentExam::isTestRun).collect(Collectors.toSet()));
         return exam;
     }
 
@@ -805,6 +884,33 @@ public class ExamService {
     }
 
     /**
+     * Returns if the exam is over by checking if the latest individual exam end date plus grace period has passed.
+     * See {@link ExamService#getLatestIndividualExamEndDate}
+     * <p>
+     *
+     * @param examId the id of the exam
+     * @return true if the exam is over and the students cannot submit anymore
+     * @throws EntityNotFoundException if no exam with the given examId can be found
+     */
+    public boolean isExamOver(Long examId) {
+        return isExamOver(findOne(examId));
+    }
+
+    /**
+     * Returns if the exam is over by checking if the latest individual exam end date plus grace period has passed.
+     * See {@link ExamService#getLatestIndividualExamEndDate}
+     * <p>
+     *
+     * @param exam the exam
+     * @return true if the exam is over and the students cannot submit anymore
+     * @throws EntityNotFoundException if no exam with the given examId can be found
+     */
+    public boolean isExamOver(Exam exam) {
+        var now = ZonedDateTime.now();
+        return getLatestIndividualExamEndDate(exam).plusSeconds(exam.getGracePeriod()).isBefore(now);
+    }
+
+    /**
      * Returns the latest individual exam end date as determined by the working time of the student exams.
      * <p>
      * If no student exams are available, the exam end date is returned.
@@ -813,8 +919,8 @@ public class ExamService {
      * @return the latest end date or the exam end date if no student exams are found. May return <code>null</code>, if the exam has no start/end date.
      * @throws EntityNotFoundException if no exam with the given examId can be found
      */
-    public ZonedDateTime getLatestIndiviudalExamEndDate(Long examId) {
-        return getLatestIndiviudalExamEndDate(findOne(examId));
+    public ZonedDateTime getLatestIndividualExamEndDate(Long examId) {
+        return getLatestIndividualExamEndDate(findOne(examId));
     }
 
     /**
@@ -825,7 +931,7 @@ public class ExamService {
      * @param exam the exam
      * @return the latest end date or the exam end date if no student exams are found. May return <code>null</code>, if the exam has no start/end date.
      */
-    public ZonedDateTime getLatestIndiviudalExamEndDate(Exam exam) {
+    public ZonedDateTime getLatestIndividualExamEndDate(Exam exam) {
         if (exam.getStartDate() == null) {
             return null;
         }
@@ -842,8 +948,8 @@ public class ExamService {
      * @return a set of all end dates. May return an empty set, if the exam has no start/end date or student exams cannot be found.
      * @throws EntityNotFoundException if no exam with the given examId can be found
      */
-    public Set<ZonedDateTime> getAllIndiviudalExamEndDates(Long examId) {
-        return getAllIndiviudalExamEndDates(findOne(examId));
+    public Set<ZonedDateTime> getAllIndividualExamEndDates(Long examId) {
+        return getAllIndividualExamEndDates(findOne(examId));
     }
 
     /**
@@ -854,7 +960,7 @@ public class ExamService {
      * @param exam the exam
      * @return a set of all end dates. May return an empty set, if the exam has no start/end date or student exams cannot be found.
      */
-    public Set<ZonedDateTime> getAllIndiviudalExamEndDates(Exam exam) {
+    public Set<ZonedDateTime> getAllIndividualExamEndDates(Exam exam) {
         if (exam.getStartDate() == null) {
             return null;
         }
@@ -883,4 +989,64 @@ public class ExamService {
         return examRepository.isUserRegisteredForExam(examId, userId);
     }
 
+    /**
+     * Registers student to the exam. In order to do this,  we add the user the the course group, because the user only has access to the exam of a course if the student also has access to the course of the exam.
+     * We only need to add the user to the course group, if the student is not yet part of it, otherwise the student cannot access the exam (within the course).
+     *
+     * @param course the course containing the exam
+     * @param exam the exam for which we want to register a student
+     * @param student the student to be registered to the exam
+     */
+    public void registerStudentToExam(Course course, Exam exam, User student) {
+        exam.addRegisteredUser(student);
+
+        if (!student.getGroups().contains(course.getStudentGroupName())) {
+            userService.addUserToGroup(student, course.getStudentGroupName());
+        }
+        examRepository.save(exam);
+
+        User currentUser = userService.getUserWithGroupsAndAuthorities();
+        AuditEvent auditEvent = new AuditEvent(currentUser.getLogin(), Constants.ADD_USER_TO_EXAM, "exam=" + exam.getTitle(), "user=" + student.getLogin());
+        auditEventRepository.add(auditEvent);
+        log.info("User " + currentUser.getLogin() + " has added user " + student.getLogin() + " to the exam " + exam.getTitle() + " with id " + exam.getId());
+    }
+
+    /**
+     *
+     * @param examId
+     * @param withParticipationsAndSubmission
+     * @param student
+     */
+    public void unregisterStudentFromExam(Long examId, boolean withParticipationsAndSubmission, User student) {
+        var exam = findOneWithRegisteredUsers(examId);
+        exam.removeRegisteredUser(student);
+
+        // Note: we intentionally do not remove the user from the course, because the student might just have "deregistered" from the exam, but should
+        // still have access to the course.
+        examRepository.save(exam);
+
+        // The student exam might already be generated, then we need to delete it
+        Optional<StudentExam> optionalStudentExam = studentExamService.findOneWithExercisesByUserIdAndExamIdOptional(student.getId(), exam.getId());
+        if (optionalStudentExam.isPresent()) {
+            StudentExam studentExam = optionalStudentExam.get();
+
+            // Optionally delete participations and submissions
+            if (withParticipationsAndSubmission) {
+                List<StudentParticipation> participations = participationService.findByStudentIdAndIndividualExercisesWithEagerSubmissionsResult(student.getId(),
+                        studentExam.getExercises());
+                for (var participation : participations) {
+                    participationService.delete(participation.getId(), true, true);
+                }
+            }
+
+            // Delete the student exam
+            studentExamService.deleteStudentExam(studentExam.getId());
+        }
+
+        User currentUser = userService.getUserWithGroupsAndAuthorities();
+        AuditEvent auditEvent = new AuditEvent(currentUser.getLogin(), Constants.REMOVE_USER_FROM_EXAM, "exam=" + exam.getTitle(), "user=" + student.getLogin());
+        auditEventRepository.add(auditEvent);
+        log.info("User " + currentUser.getLogin() + " has removed user " + student.getLogin() + " from the exam " + exam.getTitle() + " with id " + exam.getId()
+                + ". This also deleted a potentially existing student exam with all its participations and submissions.");
+    }
 }

@@ -15,6 +15,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import de.tum.in.www1.artemis.domain.Course;
 import de.tum.in.www1.artemis.domain.FileUploadExercise;
 import de.tum.in.www1.artemis.domain.GradingCriterion;
+import de.tum.in.www1.artemis.domain.enumeration.IncludedInOverallScore;
 import de.tum.in.www1.artemis.domain.exam.ExerciseGroup;
 import de.tum.in.www1.artemis.repository.CourseRepository;
 import de.tum.in.www1.artemis.repository.ExerciseRepository;
@@ -61,6 +62,37 @@ public class FileUploadExerciseIntegrationTest extends AbstractSpringIntegration
 
     @Test
     @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createFileUploadExercise_InvalidMaxScore() throws Exception {
+        FileUploadExercise fileUploadExercise = database.createFileUploadExercisesWithCourse().get(0);
+        fileUploadExercise.setFilePattern(creationFilePattern);
+        fileUploadExercise.setMaxScore(0.0);
+        request.postWithResponseBody("/api/file-upload-exercises", fileUploadExercise, FileUploadExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createFileUploadExercise_IncludedAsBonusInvalidBonusPoints() throws Exception {
+        FileUploadExercise fileUploadExercise = database.createFileUploadExercisesWithCourse().get(0);
+        fileUploadExercise.setFilePattern(creationFilePattern);
+        fileUploadExercise.setMaxScore(10.0);
+        fileUploadExercise.setBonusPoints(1.0);
+        fileUploadExercise.setIncludedInOverallScore(IncludedInOverallScore.INCLUDED_AS_BONUS);
+        request.postWithResponseBody("/api/file-upload-exercises", fileUploadExercise, FileUploadExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createFileUploadExercise_NotIncludedInvalidBonusPoints() throws Exception {
+        FileUploadExercise fileUploadExercise = database.createFileUploadExercisesWithCourse().get(0);
+        fileUploadExercise.setFilePattern(creationFilePattern);
+        fileUploadExercise.setMaxScore(10.0);
+        fileUploadExercise.setBonusPoints(1.0);
+        fileUploadExercise.setIncludedInOverallScore(IncludedInOverallScore.NOT_INCLUDED);
+        request.postWithResponseBody("/api/file-upload-exercises", fileUploadExercise, FileUploadExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
     public void createFileUploadExercise() throws Exception {
         FileUploadExercise fileUploadExercise = database.createFileUploadExercisesWithCourse().get(0);
         fileUploadExercise.setFilePattern(creationFilePattern);
@@ -96,7 +128,7 @@ public class FileUploadExerciseIntegrationTest extends AbstractSpringIntegration
         assertThat(createdFileUploadExercise).isNotNull();
         assertThat(createdFileUploadExercise.getId()).isNotNull();
         assertThat(createdFileUploadExercise.getFilePattern()).isEqualTo(creationFilePattern.toLowerCase().replaceAll("\\s+", ""));
-        assertThat(!createdFileUploadExercise.hasCourse()).as("course was not set for exam exercise");
+        assertThat(!createdFileUploadExercise.isCourseExercise()).as("course was not set for exam exercise");
         assertThat(createdFileUploadExercise.getExerciseGroup()).as("exerciseGroup was set for exam exercise").isNotNull();
         assertThat(createdFileUploadExercise.getExerciseGroup().getId()).as("exerciseGroupId was set correctly").isEqualTo(exerciseGroup.getId());
 
@@ -218,7 +250,7 @@ public class FileUploadExerciseIntegrationTest extends AbstractSpringIntegration
                 FileUploadExercise.class, HttpStatus.OK);
 
         assertThat(updatedFileUploadExercise.getTitle().equals(newTitle));
-        assertThat(!updatedFileUploadExercise.hasCourse()).as("course was not set for exam exercise");
+        assertThat(!updatedFileUploadExercise.isCourseExercise()).as("course was not set for exam exercise");
         assertThat(updatedFileUploadExercise.getExerciseGroup()).as("exerciseGroup was set for exam exercise").isNotNull();
         assertThat(updatedFileUploadExercise.getExerciseGroup().getId()).as("exerciseGroupId was not updated").isEqualTo(fileUploadExercise.getExerciseGroup().getId());
     }

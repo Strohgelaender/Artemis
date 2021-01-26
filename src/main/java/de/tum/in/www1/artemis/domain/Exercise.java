@@ -13,10 +13,7 @@ import org.hibernate.annotations.DiscriminatorOptions;
 
 import com.fasterxml.jackson.annotation.*;
 
-import de.tum.in.www1.artemis.domain.enumeration.AssessmentType;
-import de.tum.in.www1.artemis.domain.enumeration.DifficultyLevel;
-import de.tum.in.www1.artemis.domain.enumeration.ExerciseMode;
-import de.tum.in.www1.artemis.domain.enumeration.InitializationState;
+import de.tum.in.www1.artemis.domain.enumeration.*;
 import de.tum.in.www1.artemis.domain.exam.ExerciseGroup;
 import de.tum.in.www1.artemis.domain.modeling.ModelingExercise;
 import de.tum.in.www1.artemis.domain.participation.Participation;
@@ -73,6 +70,10 @@ public abstract class Exercise extends DomainObject {
     @Enumerated(EnumType.STRING)
     @Column(name = "assessment_type")
     private AssessmentType assessmentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "included_in_overall_score")
+    private IncludedInOverallScore includedInOverallScore = IncludedInOverallScore.INCLUDED_COMPLETELY;
 
     @Column(name = "problem_statement")
     @Lob
@@ -161,7 +162,10 @@ public abstract class Exercise extends DomainObject {
     private DueDateStat numberOfSubmissionsTransient;
 
     @Transient
-    private DueDateStat numberOfAssessmentsTransient;
+    private DueDateStat totalNumberOfAssessmentsTransient;
+
+    @Transient
+    private DueDateStat[] numberOfAssessmentsOfCorrectionRoundsTransient;
 
     @Transient
     private Long numberOfComplaintsTransient;
@@ -382,7 +386,7 @@ public abstract class Exercise extends DomainObject {
     }
 
     @JsonIgnore
-    public boolean hasCourse() {
+    public boolean isCourseExercise() {
         return this.course != null;
     }
 
@@ -395,7 +399,7 @@ public abstract class Exercise extends DomainObject {
     }
 
     @JsonIgnore
-    public boolean hasExerciseGroup() {
+    public boolean isExamExercise() {
         return this.exerciseGroup != null;
     }
 
@@ -407,7 +411,7 @@ public abstract class Exercise extends DomainObject {
      */
     @JsonIgnore
     public Course getCourseViaExerciseGroupOrCourseMember() {
-        if (hasExerciseGroup()) {
+        if (isExamExercise()) {
             return this.getExerciseGroup().getExam().getCourse();
         }
         else {
@@ -568,7 +572,7 @@ public abstract class Exercise extends DomainObject {
             // Check that submission was submitted in time (rated). For non programming exercises we check if the assessment due date has passed (if set)
             if (Boolean.TRUE.equals(result.isRated()) && (!isProgrammingExercise && isAssessmentOver
                     // For programming exercises we check that the assessment due date has passed (if set) for manual results otherwise we always show the automatic result
-                    || isProgrammingExercise && ((result.isManualResult() && isAssessmentOver) || result.getAssessmentType().equals(AssessmentType.AUTOMATIC)))) {
+                    || isProgrammingExercise && ((result.isManual() && isAssessmentOver) || result.getAssessmentType().equals(AssessmentType.AUTOMATIC)))) {
                 // take the first found result that fulfills the above requirements
                 if (latestSubmission == null) {
                     latestSubmission = submission;
@@ -699,12 +703,20 @@ public abstract class Exercise extends DomainObject {
         this.numberOfSubmissionsTransient = numberOfSubmissions;
     }
 
-    public DueDateStat getNumberOfAssessments() {
-        return numberOfAssessmentsTransient;
+    public DueDateStat getTotalNumberOfAssessments() {
+        return totalNumberOfAssessmentsTransient;
     }
 
-    public void setNumberOfAssessments(DueDateStat numberOfAssessments) {
-        this.numberOfAssessmentsTransient = numberOfAssessments;
+    public void setTotalNumberOfAssessments(DueDateStat totalNumberOfAssessments) {
+        this.totalNumberOfAssessmentsTransient = totalNumberOfAssessments;
+    }
+
+    public DueDateStat[] getNumberOfAssessmentsOfCorrectionRounds() {
+        return numberOfAssessmentsOfCorrectionRoundsTransient;
+    }
+
+    public void setNumberOfAssessmentsOfCorrectionRounds(DueDateStat[] numberOfAssessmentsOfCorrectionRoundsTransient) {
+        this.numberOfAssessmentsOfCorrectionRoundsTransient = numberOfAssessmentsOfCorrectionRoundsTransient;
     }
 
     public Long getNumberOfComplaints() {
@@ -747,7 +759,7 @@ public abstract class Exercise extends DomainObject {
     public boolean isReleased() {
         // Exam
         ZonedDateTime releaseDate;
-        if (this.hasExerciseGroup()) {
+        if (this.isExamExercise()) {
             releaseDate = this.getExerciseGroup().getExam().getStartDate();
         }
         else {
@@ -803,13 +815,21 @@ public abstract class Exercise extends DomainObject {
         }
     }
 
+    public IncludedInOverallScore getIncludedInOverallScore() {
+        return includedInOverallScore;
+    }
+
+    public void setIncludedInOverallScore(IncludedInOverallScore includedInOverallScore) {
+        this.includedInOverallScore = includedInOverallScore;
+    }
+
     /**
      * Columns for which we allow a pageable search. For example see {@see de.tum.in.www1.artemis.service.TextExerciseService#getAllOnPageWithSize(PageableSearchDTO, User)}}
      * method. This ensures, that we can't search in columns that don't exist, or we do not want to be searchable.
      */
     public enum ExerciseSearchColumn {
 
-        ID("id"), TITLE("title"), COURSE_TITLE("course.title");
+        ID("id"), TITLE("title"), PROGRAMMING_LANGUAGE("programmingLanguage"), COURSE_TITLE("course.title");
 
         private String mappedColumnName;
 

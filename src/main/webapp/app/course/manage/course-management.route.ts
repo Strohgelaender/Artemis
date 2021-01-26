@@ -13,6 +13,9 @@ import { CourseManagementExercisesComponent } from './course-management-exercise
 import { CourseGroupComponent } from 'app/course/manage/course-group.component';
 import { Authority } from 'app/shared/constants/authority.constants';
 import { RatingListComponent } from 'app/exercises/shared/rating/rating-list/rating-list.component';
+import { LearningGoalManagementComponent } from 'app/course/learning-goals/learning-goal-management/learning-goal-management.component';
+import { CreateLearningGoalComponent } from 'app/course/learning-goals/create-learning-goal/create-learning-goal.component';
+import { EditLearningGoalComponent } from 'app/course/learning-goals/edit-learning-goal/edit-learning-goal.component';
 
 @Injectable({ providedIn: 'root' })
 export class CourseResolve implements Resolve<Course> {
@@ -65,6 +68,16 @@ export const courseManagementState: Routes = [
             breadcrumbLabelVariable: 'course.title',
         },
         canActivate: [UserRouteAccessService],
+    },
+    {
+        // Create a new path without a component defined to prevent resolver caching and the CourseDetailComponent from being always rendered
+        path: ':courseId',
+        resolve: {
+            course: CourseResolve,
+        },
+        data: {
+            breadcrumbLabelVariable: 'course.title',
+        },
         children: [
             {
                 path: 'exercises',
@@ -72,6 +85,7 @@ export const courseManagementState: Routes = [
                 data: {
                     authorities: [Authority.INSTRUCTOR, Authority.TA, Authority.ADMIN],
                     pageTitle: 'artemisApp.course.exercises',
+                    breadcrumbLabelVariable: '',
                 },
                 canActivate: [UserRouteAccessService],
             },
@@ -81,6 +95,7 @@ export const courseManagementState: Routes = [
                 data: {
                     authorities: [Authority.INSTRUCTOR, Authority.ADMIN],
                     pageTitle: 'artemisApp.course.home.editLabel',
+                    breadcrumbLabelVariable: '',
                 },
                 canActivate: [UserRouteAccessService],
             },
@@ -90,6 +105,7 @@ export const courseManagementState: Routes = [
                 data: {
                     authorities: [Authority.INSTRUCTOR, Authority.ADMIN],
                     pageTitle: 'userManagement.groups',
+                    breadcrumbLabelVariable: '',
                 },
                 canActivate: [UserRouteAccessService],
             },
@@ -99,8 +115,47 @@ export const courseManagementState: Routes = [
                 data: {
                     authorities: [Authority.INSTRUCTOR, Authority.ADMIN],
                     pageTitle: 'artemisApp.ratingList.pageTitle',
+                    breadcrumbLabelVariable: '',
                 },
                 canActivate: [UserRouteAccessService],
+            },
+            {
+                path: 'goal-management',
+                component: LearningGoalManagementComponent,
+                data: {
+                    authorities: ['ROLE_ADMIN', 'ROLE_INSTRUCTOR'],
+                    pageTitle: 'artemisApp.learningGoal.manageLearningGoals.title',
+                    breadcrumbLabelVariable: '',
+                },
+                canActivate: [UserRouteAccessService],
+            },
+            {
+                // Create a new path without a component defined to prevent the LearningGoalManagementComponent from being always rendered
+                path: 'goal-management',
+                data: {
+                    pageTitle: 'artemisApp.learningGoal.manageLearningGoals.title',
+                    breadcrumbLabelVariable: '',
+                },
+                children: [
+                    {
+                        path: 'create',
+                        component: CreateLearningGoalComponent,
+                        data: {
+                            authorities: ['ROLE_ADMIN', 'ROLE_INSTRUCTOR'],
+                            pageTitle: 'artemisApp.learningGoal.createLearningGoal.title',
+                        },
+                        canActivate: [UserRouteAccessService],
+                    },
+                    {
+                        path: ':learningGoalId/edit',
+                        component: EditLearningGoalComponent,
+                        data: {
+                            authorities: ['ROLE_ADMIN', 'ROLE_INSTRUCTOR'],
+                            pageTitle: 'artemisApp.learningGoal.editLearningGoal.title',
+                        },
+                        canActivate: [UserRouteAccessService],
+                    },
+                ],
             },
         ],
     },

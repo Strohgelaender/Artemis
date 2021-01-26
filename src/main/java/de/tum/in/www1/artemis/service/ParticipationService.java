@@ -2,7 +2,6 @@ package de.tum.in.www1.artemis.service;
 
 import static de.tum.in.www1.artemis.domain.enumeration.InitializationState.*;
 
-import java.net.URL;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,7 +25,7 @@ import de.tum.in.www1.artemis.domain.modeling.ModelingSubmission;
 import de.tum.in.www1.artemis.domain.participation.*;
 import de.tum.in.www1.artemis.domain.quiz.QuizExercise;
 import de.tum.in.www1.artemis.domain.quiz.QuizSubmission;
-import de.tum.in.www1.artemis.exception.ContinousIntegrationException;
+import de.tum.in.www1.artemis.exception.ContinuousIntegrationException;
 import de.tum.in.www1.artemis.exception.VersionControlException;
 import de.tum.in.www1.artemis.repository.*;
 import de.tum.in.www1.artemis.service.connectors.ContinuousIntegrationService;
@@ -216,23 +215,8 @@ public class ParticipationService {
             participation.setExercise(exercise);
         }
 
-        // specific to programming exercises
         if (exercise instanceof ProgrammingExercise) {
-            ProgrammingExerciseStudentParticipation programmingExerciseStudentParticipation = (ProgrammingExerciseStudentParticipation) participation;
-            programmingExerciseStudentParticipation = forkRepository(programmingExerciseStudentParticipation);
-            programmingExerciseStudentParticipation = configureRepository((ProgrammingExercise) exercise, programmingExerciseStudentParticipation);
-            programmingExerciseStudentParticipation = copyBuildPlan(programmingExerciseStudentParticipation);
-            // Restore programming exercise that got removed due to saving the programmingExerciseStudentParticipation
-            programmingExerciseStudentParticipation.setProgrammingExercise((ProgrammingExercise) exercise);
-            programmingExerciseStudentParticipation = configureBuildPlan(programmingExerciseStudentParticipation);
-            // we might need to perform an empty commit (depends on the CI system), we perform this here, because it should not trigger a new programming submission
-            programmingExerciseStudentParticipation = performEmptyCommit(programmingExerciseStudentParticipation);
-            // Note: we configure the repository webhook last, so that the potential empty commit does not trigger a new programming submission (see empty-commit-necessary)
-            programmingExerciseStudentParticipation = configureRepositoryWebHook(programmingExerciseStudentParticipation);
-            programmingExerciseStudentParticipation.setInitializationState(INITIALIZED);
-            programmingExerciseStudentParticipation.setInitializationDate(ZonedDateTime.now());
-            // after saving, we need to make sure the object that is used after the if statement is the right one
-            participation = programmingExerciseStudentParticipation;
+            participation = startProgrammingExercise((ProgrammingExercise) exercise, (ProgrammingExerciseStudentParticipation) participation);
         }
         else {// for all other exercises: QuizExercise, ModelingExercise, TextExercise, FileUploadExercise
             if (participation.getInitializationState() == null || participation.getInitializationState() == UNINITIALIZED || participation.getInitializationState() == FINISHED) {
@@ -254,6 +238,35 @@ public class ParticipationService {
             }
         }
         return save(participation);
+    }
+
+    /**
+     * Start a programming exercise participation (which does not exist yet) by creating and configuring a student git repository (step 1) and a student build plan (step 2)
+     * based on the templates in the given programming exercise
+     *
+     * @param exercise the programming exercise that the currently active user (student) wants to start
+     * @param participation inactive participation
+     * @return started participation
+     */
+    private StudentParticipation startProgrammingExercise(ProgrammingExercise exercise, ProgrammingExerciseStudentParticipation participation) {
+        // Step 1a) create the student repository (based on the template repository)
+        participation = copyRepository(participation);
+        // Step 1b) configure the student repository (e.g. access right, etc.)
+        participation = configureRepository(exercise, participation);
+        // Step 2a) create the build plan (based on the BASE build plan)
+        participation = copyBuildPlan(participation);
+        // Step 2b) configure the build plan (e.g. access right, hooks, etc.)
+        participation = configureBuildPlan(participation);
+        // Step 2c) we might need to perform an empty commit (as a workaround, depending on the CI system) here, because it should not trigger a new programming submission
+        // (when the web hook was already initialized, see below)
+        participation = performEmptyCommit(participation);
+        // Note: we configure the repository webhook last, so that the potential empty commit does not trigger a new programming submission (see empty-commit-necessary)
+        // Step 3) configure the web hook of the student repository
+        participation = configureRepositoryWebHook(participation);
+        participation.setInitializationState(INITIALIZED);
+        participation.setInitializationDate(ZonedDateTime.now());
+        // after saving, we need to make sure the object that is used after the if statement is the right one
+        return participation;
     }
 
     /**
@@ -282,7 +295,7 @@ public class ParticipationService {
             }
             submission.setSubmissionDate(ZonedDateTime.now());
             // We add a result for test runs with the user set as an assessor in order to make sure it doesnt show up for assessment for the tutors
-            submission = submissionRepository.findWithEagerResultsById(submission.getId()).get();
+            submission = submissionRepository.findWithEagerResultsAndAssessorById(submission.getId()).get();
             if (submission.getLatestResult() == null) {
                 Result result = new Result();
                 result.setParticipation(submission.getParticipation());
@@ -334,14 +347,14 @@ public class ParticipationService {
             ProgrammingExercise programmingExercise = (ProgrammingExercise) exercise;
             ProgrammingExerciseStudentParticipation programmingParticipation = (ProgrammingExerciseStudentParticipation) participation;
             // Note: we need a repository, otherwise the student cannot click resume.
-            programmingParticipation = forkRepository(programmingParticipation);
+            programmingParticipation = copyRepository(programmingParticipation);
             programmingParticipation = configureRepository(programmingExercise, programmingParticipation);
             programmingParticipation = configureRepositoryWebHook(programmingParticipation);
             participation = programmingParticipation;
             if (programmingExercise.getBuildAndTestStudentSubmissionsAfterDueDate() != null || programmingExercise.getAssessmentType() != AssessmentType.AUTOMATIC) {
                 // restrict access for the student
                 try {
-                    versionControlService.get().setRepositoryPermissionsToReadOnly(programmingParticipation.getRepositoryUrlAsUrl(), programmingExercise.getProjectKey(),
+                    versionControlService.get().setRepositoryPermissionsToReadOnly(programmingParticipation.getVcsRepositoryUrl(), programmingExercise.getProjectKey(),
                             programmingParticipation.getStudents());
                 }
                 catch (VersionControlException e) {
@@ -409,7 +422,7 @@ public class ParticipationService {
         submission.setType(submissionType);
         submission.setParticipation(participation);
         submissionRepository.save(submission);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         return Optional.of(submission);
     }
 
@@ -474,20 +487,25 @@ public class ParticipationService {
      * @param participationId of submission
      * @return List<submission>
      */
-    public List<Submission> getSubmissionsWithParticipationId(long participationId) {
-        return submissionRepository.findAllWithResultsByParticipationId(participationId);
+    public List<Submission> getSubmissionsWithResultsAndAssessorsByParticipationId(long participationId) {
+        return submissionRepository.findAllWithResultsAndAssessorByParticipationId(participationId);
     }
 
     /**
-     * Service method to resume inactive participation (with previously deleted build plan)
+     * Resume an inactive programming exercise participation (with previously deleted build plan) by creating and configuring a student build plan (step 2)
+     * based on the template (BASE) in the corresponding programming exercise, also compare {@link #startProgrammingExercise}
      *
      * @param participation inactive participation
      * @return resumed participation
      */
-    public ProgrammingExerciseStudentParticipation resumeExercise(ProgrammingExerciseStudentParticipation participation) {
+    public ProgrammingExerciseStudentParticipation resumeProgrammingExercise(ProgrammingExerciseStudentParticipation participation) {
+        // this method assumes that the student git repository already exists (compare startProgrammingExercise) so steps 1, 2 and 5 are not necessary
+        // Step 2a) create the build plan (based on the BASE build plan)
         participation = copyBuildPlan(participation);
+        // Step 2b) configure the build plan (e.g. access right, hooks, etc.)
         participation = configureBuildPlan(participation);
-        // Note: the repository webhook already exists so we don't need to set it up again
+        // Note: the repository webhook (step 1c) already exists so we don't need to set it up again, the empty commit hook (step 2c) is also not necessary here
+        // and must be handled by the calling method in case it would be necessary
         participation.setInitializationState(INITIALIZED);
         participation = save(participation);
         if (participation.getInitializationDate() == null) {
@@ -497,16 +515,16 @@ public class ParticipationService {
         return save(participation);
     }
 
-    private ProgrammingExerciseStudentParticipation forkRepository(ProgrammingExerciseStudentParticipation participation) {
+    private ProgrammingExerciseStudentParticipation copyRepository(ProgrammingExerciseStudentParticipation participation) {
         // only execute this step if it has not yet been completed yet or if the repository url is missing for some reason
-        if (!participation.getInitializationState().hasCompletedState(InitializationState.REPO_COPIED) || participation.getRepositoryUrlAsUrl() == null) {
+        if (!participation.getInitializationState().hasCompletedState(InitializationState.REPO_COPIED) || participation.getVcsRepositoryUrl() == null) {
             final var programmingExercise = participation.getProgrammingExercise();
             final var projectKey = programmingExercise.getProjectKey();
             final var participantIdentifier = participation.getParticipantIdentifier();
             // NOTE: we have to get the repository slug of the template participation here, because not all exercises (in particular old ones) follow the naming conventions
-            final var templateRepoName = urlService.getRepositorySlugFromUrl(programmingExercise.getTemplateParticipation().getRepositoryUrlAsUrl());
+            final var templateRepoName = urlService.getRepositorySlugFromRepositoryUrl(programmingExercise.getTemplateParticipation().getVcsRepositoryUrl());
             // the next action includes recovery, which means if the repository has already been copied, we simply retrieve the repository url and do not copy it again
-            var newRepoUrl = versionControlService.get().forkRepository(projectKey, templateRepoName, projectKey, participantIdentifier);
+            var newRepoUrl = versionControlService.get().copyRepository(projectKey, templateRepoName, projectKey, participantIdentifier);
             // add the userInfo part to the repoURL only if the participation belongs to a single student (and not a team of students)
             if (participation.getStudent().isPresent()) {
                 newRepoUrl = newRepoUrl.withUser(participantIdentifier);
@@ -525,7 +543,7 @@ public class ParticipationService {
         if (!participation.getInitializationState().hasCompletedState(InitializationState.REPO_CONFIGURED)) {
             // do not allow the student to access the repository if this is an exam exercise that has not started yet
             boolean allowAccess = !isExamExercise(exercise) || ZonedDateTime.now().isAfter(getIndividualReleaseDate(exercise));
-            versionControlService.get().configureRepository(exercise, participation.getRepositoryUrlAsUrl(), participation.getStudents(), allowAccess);
+            versionControlService.get().configureRepository(exercise, participation.getVcsRepositoryUrl(), participation.getStudents(), allowAccess);
             participation.setInitializationState(InitializationState.REPO_CONFIGURED);
             return save(participation);
         }
@@ -558,7 +576,7 @@ public class ParticipationService {
             try {
                 continuousIntegrationService.get().configureBuildPlan(participation);
             }
-            catch (ContinousIntegrationException ex) {
+            catch (ContinuousIntegrationException ex) {
                 // this means something with the configuration of the build plan is wrong.
                 // we try to recover from typical edge cases by setting the initialization state back, so that the previous action (copy build plan) is tried again, when
                 // the user again clicks on the start / resume exercise button.
@@ -583,7 +601,7 @@ public class ParticipationService {
     }
 
     private boolean isExamExercise(Exercise exercise) {
-        return !exercise.hasCourse();
+        return !exercise.isCourseExercise();
     }
 
     /**
@@ -925,6 +943,21 @@ public class ParticipationService {
     }
 
     /**
+     * Get all exercise participations belonging to exercise and student.
+     *
+     * @param exercise  the exercise
+     * @param studentId the id of student
+     * @return the list of exercise participations belonging to exercise and student
+     */
+    public List<StudentParticipation> findByExerciseAndStudentId(Exercise exercise, Long studentId) {
+        if (exercise.isTeamMode()) {
+            Optional<Team> optionalTeam = teamRepository.findOneByExerciseIdAndUserId(exercise.getId(), studentId);
+            return optionalTeam.map(team -> studentParticipationRepository.findByExerciseIdAndTeamId(exercise.getId(), team.getId())).orElse(List.of());
+        }
+        return studentParticipationRepository.findByExerciseIdAndStudentId(exercise.getId(), studentId);
+    }
+
+    /**
      * Get all exercise participations belonging to exercise and student with eager submissions.
      *
      * @param exercise  the exercise
@@ -971,10 +1004,11 @@ public class ParticipationService {
      * No manual result means that no user has started an assessment for the corresponding submission yet.
      *
      * @param exerciseId the id of the exercise the participations should belong to
+     * @param correctionRound - the correction round we want our submission to have results for
      * @return a list of participations including their submitted submissions that do not have a manual result
      */
-    public List<StudentParticipation> findByExerciseIdWithLatestSubmissionWithoutManualResultsAndNoTestRun(Long exerciseId) {
-        return studentParticipationRepository.findByExerciseIdWithLatestSubmissionWithoutManualResultsAndNoTestRunParticipation(exerciseId);
+    public List<StudentParticipation> findByExerciseIdWithLatestSubmissionWithoutManualResultsAndNoTestRun(Long exerciseId, int correctionRound) {
+        return studentParticipationRepository.findByExerciseIdWithLatestSubmissionWithoutManualResultsAndNoTestRunParticipation(exerciseId, correctionRound);
     }
 
     /**
@@ -1109,7 +1143,7 @@ public class ParticipationService {
     public void cleanupRepository(ProgrammingExerciseStudentParticipation participation) {
         // ignore participations without repository URL
         if (participation.getRepositoryUrl() != null) {
-            versionControlService.get().deleteRepository(participation.getRepositoryUrlAsUrl());
+            versionControlService.get().deleteRepository(participation.getVcsRepositoryUrl());
             participation.setRepositoryUrl(null);
             participation.setInitializationState(InitializationState.FINISHED);
             save(participation);
@@ -1130,7 +1164,7 @@ public class ParticipationService {
 
         if (participation instanceof ProgrammingExerciseStudentParticipation) {
             ProgrammingExerciseStudentParticipation programmingExerciseParticipation = (ProgrammingExerciseStudentParticipation) participation;
-            URL repositoryUrl = programmingExerciseParticipation.getRepositoryUrlAsUrl();
+            var repositoryUrl = programmingExerciseParticipation.getVcsRepositoryUrl();
             String buildPlanId = programmingExerciseParticipation.getBuildPlanId();
 
             if (deleteBuildPlan && buildPlanId != null) {
@@ -1147,16 +1181,7 @@ public class ParticipationService {
             }
 
             // delete local repository cache
-            try {
-                if (repositoryUrl != null && gitService.repositoryAlreadyExists(repositoryUrl)) {
-                    // We need to close the possibly still open repository otherwise an IOException will be thrown on Windows
-                    Repository repo = gitService.getOrCheckoutRepository(repositoryUrl, false);
-                    gitService.deleteLocalRepository(repo);
-                }
-            }
-            catch (Exception ex) {
-                log.error("Error while deleting local repository", ex);
-            }
+            gitService.deleteLocalRepository(repositoryUrl);
         }
 
         complaintResponseRepository.deleteByComplaint_Result_Participation_Id(participationId);
@@ -1191,7 +1216,7 @@ public class ParticipationService {
                     Submission submissionToDelete = result.getSubmission();
                     submissionRepository.deleteById(submissionToDelete.getId());
                     result.setSubmission(null);
-                    participation.removeSubmissions(submissionToDelete);
+                    participation.removeSubmission(submissionToDelete);
                 }
             }
         }
@@ -1257,6 +1282,16 @@ public class ParticipationService {
      */
     public StudentParticipation findOneWithEagerResultsAndCourse(Long participationId) {
         return studentParticipationRepository.findOneByIdWithEagerResultsAndExerciseAndEagerCourse(participationId);
+    }
+
+    /**
+     * Get one participation with eager course, eager submissions and eager results.
+     *
+     * @param paricipationId
+     * @return participation with eager course and submission
+     */
+    public StudentParticipation findOneWithEagerResultsAndCourseAndSubmissionAndResults(Long paricipationId) {
+        return studentParticipationRepository.findOneByIdWithEagerResultsAndExerciseAndEagerCourseAndEagerSubmissionAndResults(paricipationId);
     }
 
     /**

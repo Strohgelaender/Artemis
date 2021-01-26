@@ -1,26 +1,27 @@
-import { Component, OnDestroy, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs/Subscription';
 import { ActivatedRoute } from '@angular/router';
 import { User } from 'app/core/user/user.model';
 import * as moment from 'moment';
+import { sum } from 'lodash';
 import { StudentParticipation } from 'app/entities/participation/student-participation.model';
 import { ExportToCsv } from 'export-to-csv';
-import { Exercise, ExerciseType } from 'app/entities/exercise.model';
+import { Exercise, ExerciseType, IncludedInOverallScore } from 'app/entities/exercise.model';
 import { Course } from 'app/entities/course.model';
 import { CourseManagementService } from '../manage/course-management.service';
 import { SortService } from 'app/shared/service/sort.service';
 import { LocaleConversionService } from 'app/shared/service/locale-conversion.service';
 import { JhiLanguageHelper } from 'app/core/language/language.helper';
 
-const PRESENTATION_SCORE_KEY = 'Presentation Score';
-const NAME_KEY = 'Name';
-const USERNAME_KEY = 'Username';
-const EMAIL_KEY = 'Email';
-const REGISTRATION_NUMBER_KEY = 'Registration Number';
-const TOTAL_COURSE_POINTS_KEY = 'Total Course Points';
-const TOTAL_COURSE_SCORE_KEY = 'Total Course Score';
-const POINTS_KEY = 'Points';
-const SCORE_KEY = 'Score';
+export const PRESENTATION_SCORE_KEY = 'Presentation Score';
+export const NAME_KEY = 'Name';
+export const USERNAME_KEY = 'Username';
+export const EMAIL_KEY = 'Email';
+export const REGISTRATION_NUMBER_KEY = 'Registration Number';
+export const TOTAL_COURSE_POINTS_KEY = 'Total Course Points';
+export const TOTAL_COURSE_SCORE_KEY = 'Total Course Score';
+export const POINTS_KEY = 'Points';
+export const SCORE_KEY = 'Score';
 
 @Component({
     selector: 'jhi-course-scores',
@@ -33,8 +34,8 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
     readonly exerciseTypes = [ExerciseType.QUIZ, ExerciseType.PROGRAMMING, ExerciseType.MODELING, ExerciseType.TEXT, ExerciseType.FILE_UPLOAD];
 
     course: Course;
-    participations: StudentParticipation[] = [];
-    exercises: Exercise[] = [];
+    allParticipationsOfCourse: StudentParticipation[] = [];
+    exercisesOfCourseThatAreIncludedInScoreCalculation: Exercise[] = [];
     students: Student[] = [];
 
     exerciseSuccessfulPerType = new Map<ExerciseType, number[]>();
@@ -80,9 +81,11 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
         this.paramSub = this.route.params.subscribe((params) => {
             this.courseService.findWithExercises(params['courseId']).subscribe((res) => {
                 this.course = res.body!;
-                this.exercises = this.course
+                this.exercisesOfCourseThatAreIncludedInScoreCalculation = this.course
                     .exercises!.filter((exercise) => {
-                        return !exercise.releaseDate || exercise.releaseDate.isBefore(moment());
+                        const isReleasedExercise = !exercise.releaseDate || exercise.releaseDate.isBefore(moment());
+                        const isExerciseThatCounts = exercise.includedInOverallScore !== IncludedInOverallScore.NOT_INCLUDED;
+                        return isReleasedExercise && isExerciseThatCounts;
                     })
                     .sort((e1: Exercise, e2: Exercise) => {
                         if (e1.dueDate! > e2.dueDate!) {
@@ -99,7 +102,7 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
                         }
                         return 0;
                     });
-                this.getParticipationsWithResults(this.course.id!);
+                this.calculateCourseStatistics(this.course.id!);
             });
         });
 
@@ -110,14 +113,14 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Fetch all participations with result for a course from the server.
+     * Fetch all participations with results from the server for the specified course and calculate the corresponding course statistics
      * @param courseId Id of the course
      */
-    getParticipationsWithResults(courseId: number) {
-        this.courseService.findAllParticipationsWithResults(courseId).subscribe((participations) => {
-            this.participations = participations;
-            this.groupExercises();
-            this.calculatePointsPerStudent();
+    calculateCourseStatistics(courseId: number) {
+        this.courseService.findAllParticipationsWithResults(courseId).subscribe((participationsOfCourse) => {
+            this.allParticipationsOfCourse = participationsOfCourse;
+            this.calculateExerciseLevelStatistics();
+            this.calculateStudentLevelStatistics();
             this.changeDetector.detectChanges();
         });
     }
@@ -125,33 +128,39 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
     /**
      * Group the exercises by type and gather statistics for each type (titles, maxScore, accumulated max Score).
      */
-    groupExercises() {
+    calculateExerciseLevelStatistics() {
         for (const exerciseType of this.exerciseTypes) {
-            const exercisesPerType = this.exercises.filter((exercise) => exercise.type === exerciseType);
-            this.exercisesPerType.set(exerciseType, exercisesPerType);
+            const exercisesOfType = this.exercisesOfCourseThatAreIncludedInScoreCalculation.filter((exercise) => exercise.type === exerciseType);
+            this.exercisesPerType.set(exerciseType, exercisesOfType);
             this.exerciseTitlesPerType.set(
                 exerciseType,
-                exercisesPerType.map((exercise) => exercise.title!),
+                exercisesOfType.map((exercise) => exercise.title!),
             );
-            this.exerciseMaxPointsPerType.set(
-                exerciseType,
-                exercisesPerType.map((exercise) => exercise.maxScore!),
-            );
-            this.maxNumberOfPointsPerExerciseType.set(
-                exerciseType,
-                exercisesPerType.reduce((total, exercise) => total + (exercise.maxScore ? exercise.maxScore : 0), 0),
-            );
+
+            const maxPointsOfAllExercisesOfType = exercisesOfType.map((exercise) => exercise.maxScore!);
+
+            this.exerciseMaxPointsPerType.set(exerciseType, maxPointsOfAllExercisesOfType);
+
+            const maxPointsOfAllIncludedExercisesOfType = exercisesOfType
+                // only exercises marked as included_completely increase the maximum reachable number of points
+                .filter((exercise) => exercise.includedInOverallScore === IncludedInOverallScore.INCLUDED_COMPLETELY)
+                .map((exercise) => exercise.maxScore!);
+
+            this.maxNumberOfPointsPerExerciseType.set(exerciseType, sum(maxPointsOfAllIncludedExercisesOfType));
         }
-        this.maxNumberOfOverallPoints = this.exercises.reduce((total, exercise) => total + (exercise.maxScore ? exercise.maxScore : 0), 0);
+        this.maxNumberOfOverallPoints = 0;
+        for (const maxNumberOfPointsPerExerciseTypeElement of this.maxNumberOfPointsPerExerciseType) {
+            this.maxNumberOfOverallPoints += maxNumberOfPointsPerExerciseTypeElement[1];
+        }
     }
 
     /**
      * Creates students and calculates the points for each exercise and exercise type.
      */
-    calculatePointsPerStudent() {
+    calculateStudentLevelStatistics() {
         const studentsMap = new Map<number, Student>();
 
-        for (const participation of this.participations) {
+        for (const participation of this.allParticipationsOfCourse) {
             if (participation.results && participation.results.length > 0) {
                 for (const result of participation.results) {
                     // reconnect
@@ -175,7 +184,7 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
         }
 
         // prepare exercises
-        for (const exercise of this.exercises) {
+        for (const exercise of this.exercisesOfCourseThatAreIncludedInScoreCalculation) {
             exercise.numberOfParticipationsWithRatedResult = 0;
             exercise.numberOfSuccessfulParticipations = 0;
         }
@@ -183,7 +192,8 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
         studentsMap.forEach((student) => {
             this.students.push(student);
 
-            for (const exercise of this.exercises) {
+            for (const exercise of this.exercisesOfCourseThatAreIncludedInScoreCalculation) {
+                const relevantMaxPoints = exercise.maxScore!;
                 const participation = student.participations.find((part) => part.exercise!.id === exercise.id);
                 if (participation && participation.results && participation.results.length > 0) {
                     // we found a result, there should only be one
@@ -192,10 +202,10 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
                         console.warn('found more than one result for student ' + student.user.login + ' and exercise ' + exercise.title);
                     }
 
-                    const studentExerciseResultPoints = (result.score! * exercise.maxScore!) / 100;
-                    student.overallPoints += studentExerciseResultPoints;
-                    student.pointsPerExercise.set(exercise.id!, studentExerciseResultPoints);
-                    student.sumPointsPerExerciseType.set(exercise.type!, student.sumPointsPerExerciseType.get(exercise.type!)! + studentExerciseResultPoints);
+                    const pointsAchievedByStudentInExercise = (result.score! * relevantMaxPoints) / 100;
+                    student.overallPoints += pointsAchievedByStudentInExercise;
+                    student.pointsPerExercise.set(exercise.id!, pointsAchievedByStudentInExercise);
+                    student.sumPointsPerExerciseType.set(exercise.type!, student.sumPointsPerExerciseType.get(exercise.type!)! + pointsAchievedByStudentInExercise);
                     student.numberOfParticipatedExercises += 1;
                     exercise.numberOfParticipationsWithRatedResult! += 1;
                     if (result.score! >= 100) {
@@ -203,7 +213,7 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
                         exercise.numberOfSuccessfulParticipations! += 1;
                     }
 
-                    student.pointsPerExerciseType.get(exercise.type!)!.push(studentExerciseResultPoints);
+                    student.pointsPerExerciseType.get(exercise.type!)!.push(pointsAchievedByStudentInExercise);
                 } else {
                     // there is no result, the student has not participated or submitted too late
                     student.pointsPerExercise.set(exercise.id!, 0);
@@ -391,26 +401,29 @@ export class CourseScoresComponent implements OnInit, OnDestroy {
                 }
             }
             rows.push(rowDataParticipationSuccuessful);
-
-            const options = {
-                fieldSeparator: ';', // TODO: allow user to customize
-                quoteStrings: '"',
-                decimalSeparator: 'locale',
-                showLabels: true,
-                showTitle: false,
-                filename: 'Artemis Course ' + this.course.title + ' Scores',
-                useTextFile: false,
-                useBom: true,
-                headers: keys,
-            };
-
-            const csvExporter = new ExportToCsv(options);
-            csvExporter.generateCsv(rows); // includes download
+            this.exportAsCsv(rows, keys);
         }
     }
 
+    exportAsCsv(rows: any[], keys: string[]) {
+        const options = {
+            fieldSeparator: ';', // TODO: allow user to customize
+            quoteStrings: '"',
+            decimalSeparator: 'locale',
+            showLabels: true,
+            showTitle: false,
+            filename: 'Artemis Course ' + this.course.title + ' Scores',
+            useTextFile: false,
+            useBom: true,
+            headers: keys,
+        };
+
+        const csvExporter = new ExportToCsv(options);
+        csvExporter.generateCsv(rows); // includes download
+    }
+
     /**
-     * Return an empty line in csv-format with an empty row for each exercise type.
+     *an empty line in csv-format with an empty row for each exercise type.
      * @param firstValue The first value/name key of the line
      */
     private emptyLine(firstValue: string) {

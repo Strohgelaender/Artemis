@@ -17,11 +17,15 @@ import { ArtemisDatePipe } from 'app/shared/pipes/artemis-date.pipe';
 import { ArtemisDurationFromSecondsPipe } from 'app/shared/pipes/artemis-duration-from-seconds.pipe';
 import { ChartComponent } from 'app/shared/chart/chart.component';
 import { AlertComponent } from 'app/shared/alert/alert.component';
+import { CircularProgressBarComponent } from 'app/shared/circular-progress-bar/circular-progress-bar.component';
+import { CustomMinDirective } from 'app/shared/validators/custom-min-validator.directive';
+import { CustomMaxDirective } from 'app/shared/validators/custom-max-validator.directive';
 
 @NgModule({
     imports: [ArtemisSharedLibsModule, ArtemisSharedCommonModule, ArtemisSharedPipesModule],
     declarations: [
         ArtemisDatePipe,
+        CircularProgressBarComponent,
         ArtemisDurationFromSecondsPipe,
         HasAnyAuthorityDirective,
         SecuredImageComponent,
@@ -32,12 +36,15 @@ import { AlertComponent } from 'app/shared/alert/alert.component';
         SlideToggleComponent,
         JhiConnectionStatusComponent,
         ChartComponent,
+        CustomMinDirective,
+        CustomMaxDirective,
     ],
     entryComponents: [DeleteDialogComponent],
     exports: [
         ArtemisDatePipe,
         ArtemisDurationFromSecondsPipe,
         ArtemisSharedLibsModule,
+        CircularProgressBarComponent,
         FindLanguageFromKeyPipe,
         AlertComponent,
         AlertErrorComponent,
@@ -52,6 +59,9 @@ import { AlertComponent } from 'app/shared/alert/alert.component';
         SlideToggleComponent,
         JhiConnectionStatusComponent,
         ChartComponent,
+        CustomMinDirective,
+        CustomMaxDirective,
     ],
+    providers: [ArtemisDatePipe],
 })
 export class ArtemisSharedModule {}

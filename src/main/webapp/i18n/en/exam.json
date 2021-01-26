@@ -21,7 +21,8 @@
                     "yourPoints": "Your points",
                     "maxPoints": "Points",
                     "bonus": "Bonus points",
-                    "sum": "Sum"
+                    "youAchieved": "You achieved {{achievedPoints}} points out of possible {{normalPoints}} normal points and {{bonusPoints}} bonus points",
+                    "maxPointsNotSet": "The exam max points is not set."
                 }
             },
             "title": "Exam",
@@ -53,10 +54,17 @@
             "validation": {
                 "startAndEndMustBeSet": "The start and end date must be set for the exam",
                 "atLeastOneExercisePerExerciseGroup": "All exercise groups must have at least one exercise.",
+                "allExercisesInExerciseGroupOfSameIncludedType": "All exercises in an exercise group need to have the same meaning for the exam score calculation (normal exercise, bonus exercise, not included).",
+                "allExercisesInExerciseGroupGiveSameNumberOfPoints": "All exercises in an exercise group need to give the same number of points or bonus points",
+                "tooManyMaxPoints": "Check that you set the exam max points correctly! The max points a student can earn in the mandatory exercise groups is too big",
+                "tooFewMaxPoints": "Check that you set the exam max points correctly! The max points a student can earn in the exercise groups is too low",
                 "numberOfExercisesMustBeSet": "The number of exercises must be set for the exam.",
                 "numberOfExercisesInExamNotSet": "The number of exercises in the exam is not set.",
                 "tooFewExerciseGroups": "The number of exercise groups is too small.",
                 "tooManyMandatoryExerciseGroups": "The number of mandatory exercise groups is too large."
+            },
+            "error": {
+                "cannotRegisterInstructor": "You cannot register instructors or administrators to exams."
             }
         },
         "examScores": {
@@ -144,6 +152,7 @@
             "generateMissingStudentExams": "Generate missing individual exams",
             "startExercises": "Prepare exercise start",
             "evaluateQuizExercises": "Evaluate quizzes",
+            "assessUnsubmittedStudentExams": "Assess unsubmitted student exams",
             "unlockAllRepositories": "Unlock all repositories",
             "lockAllRepositories": "Lock all repositories",
             "unlockAllRepositoriesModalText": "All repositories will be immediately unlocked! Students will be able to clone & push even if the exam is not started yet!\n\nThis operation is automatically performed once the exam is set to visible, therefore this operation should only be used manually if the automatic unlock failed!",
@@ -174,6 +183,8 @@
             "studentExamStatusWarningTooltip": "Click on the button 'Generate missing individual exams' to create the missing student exams. Alternatively, click the button 'Generate individual exams' to delete and re-create exams for all students",
             "evaluateQuizExerciseSuccess": "{{number}} quiz exercises successfully evaluated!",
             "evaluateQuizExerciseFailure": "There was an error during the evaluation of the quiz exercises:\n {{message}}",
+            "assessUnsubmittedStudentExamsSuccess": "Reviewed all student exams and assessed the unsubmitted or empty modeling and text exercises with 0 points.",
+            "assessUnsubmittedStudentExamsFailure": "The exam is not over yet for all students",
             "unlockAllRepositoriesSuccess": "Repositories of {{number}} programming exercises were unlocked.",
             "unlockAllRepositoriesFailure": "There was an error during the unlocking of the programming exercises:\n {{message}}",
             "lockAllRepositoriesSuccess": "Repositories of {{number}} programming exercises were locked.",
@@ -198,6 +209,7 @@
             "examStudentReviewEnd": "End of Student Review",
             "maxPoints": "Maximum number of points in exam",
             "numberOfExercisesInExam": "Number of exercises in exam",
+            "numberOfCorrectionRoundsInExam": "Number of correction rounds in exam",
             "randomizeQuestionOrder": "Randomize order of exercise groups",
             "startText": "Exam start text",
             "endText": "Exam end text",
@@ -243,9 +255,10 @@
                     "buttonLabel": "Import students",
                     "dialogTitle": "Import students into:",
                     "introText": "This dialog can be used to import students into this exam.",
+                    "dialogText": "Each entry in the input file must contain a value for either matriculation number or login.<br>Values for family and first name are optional.",
                     "csvFile": {
                         "label": "Select .csv file",
-                        "tooltip": "Please select the .csv file containing the students for the import."
+                        "tooltip": "Please select the .csv file containing the students for the import. Either 'LOGIN' or 'REGISTRATION_NUMBER' column values must be present per entry."
                     },
                     "studentsForImport": {
                         "label": "Students to import",

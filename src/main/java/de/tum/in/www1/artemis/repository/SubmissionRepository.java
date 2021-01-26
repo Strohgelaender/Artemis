@@ -26,10 +26,10 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
      * @return optional submission
      */
     @EntityGraph(type = LOAD, attributePaths = { "results", "results.assessor" })
-    Optional<Submission> findWithEagerResultsById(Long submissionId);
+    Optional<Submission> findWithEagerResultsAndAssessorById(Long submissionId);
 
     @Query("select distinct submission from Submission submission left join fetch submission.results r left join fetch r.feedbacks where submission.exampleSubmission = true and submission.id = :#{#submissionId}")
-    Optional<Submission> findExampleSubmissionByIdWithEagerResult(long submissionId);
+    Optional<Submission> findExampleSubmissionByIdWithEagerResult(@Param("submissionId") long submissionId);
 
     /**
      * Get all submissions of a participation
@@ -43,8 +43,8 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
      * @param participationId the id of the participation
      * @return a list of the participation's submissions
      */
-    @EntityGraph(type = LOAD, attributePaths = { "results" })
-    List<Submission> findAllWithResultsByParticipationId(Long participationId);
+    @EntityGraph(type = LOAD, attributePaths = { "results", "results.assessor" })
+    List<Submission> findAllWithResultsAndAssessorByParticipationId(Long participationId);
 
     /**
      * Get the number of currently locked submissions for a specific user in the given course. These are all submissions for which the user started, but has not yet finished the
@@ -117,6 +117,9 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     long countByExerciseIdSubmittedAfterDueDate(@Param("exerciseId") long exerciseId);
 
     /**
+     * Returns submissions for a exercise. Returns only a submission that has a result with a matching assessor. Since the results list may also contain
+     * automatic results but those results do not have an assessor, hibernate simply sets null values for them. Make sure to use a different query if you need
+     * your submission to have all its results set.
      *
      * @param exerciseId the exercise id we are interested in
      * @param assessor the assessor we are interested in

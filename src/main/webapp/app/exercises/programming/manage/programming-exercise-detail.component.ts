@@ -9,13 +9,15 @@ import { JhiAlertService } from 'ng-jhipster';
 import { ProgrammingExerciseParticipationType } from 'app/entities/programming-exercise-participation.model';
 import { ProgrammingExerciseParticipationService } from 'app/exercises/programming/manage/services/programming-exercise-participation.service';
 import { AccountService } from 'app/core/auth/account.service';
-import { HttpErrorResponse, HttpResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActionType } from 'app/shared/delete-dialog/delete-dialog.model';
 import { FeatureToggle } from 'app/shared/feature-toggle/feature-toggle.service';
 import { ExerciseService } from 'app/exercises/shared/exercise/exercise.service';
 import { ExerciseType } from 'app/entities/exercise.model';
-import { downloadZipFileFromResponse } from 'app/shared/util/download.util';
 import { JhiEventManager } from 'ng-jhipster';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { ConfirmAutofocusModalComponent } from 'app/shared/components/confirm-autofocus-button.component';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
     selector: 'jhi-programming-exercise-detail',
@@ -35,6 +37,7 @@ export class ProgrammingExerciseDetailComponent implements OnInit, OnDestroy {
 
     loadingTemplateParticipationResults = true;
     loadingSolutionParticipationResults = true;
+    lockingOrUnlockingRepositories = false;
 
     private dialogErrorSource = new Subject<string>();
     dialogError$ = this.dialogErrorSource.asObservable();
@@ -48,6 +51,8 @@ export class ProgrammingExerciseDetailComponent implements OnInit, OnDestroy {
         private jhiAlertService: JhiAlertService,
         private programmingExerciseParticipationService: ProgrammingExerciseParticipationService,
         private eventManager: JhiEventManager,
+        private modalService: NgbModal,
+        private translateService: TranslateService,
     ) {}
 
     ngOnInit() {
@@ -120,19 +125,6 @@ export class ProgrammingExerciseDetailComponent implements OnInit, OnDestroy {
         }
     }
 
-    checkPlagiarism() {
-        this.checkPlagiarismInProgress = true;
-        this.programmingExerciseService.checkPlagiarism(this.programmingExercise.id!).subscribe(this.handleCheckPlagiarismResponse, () => {
-            this.checkPlagiarismInProgress = false;
-        });
-    }
-
-    handleCheckPlagiarismResponse = (response: HttpResponse<Blob>) => {
-        this.jhiAlertService.success('artemisApp.programmingExercise.checkPlagiarismSuccess');
-        this.checkPlagiarismInProgress = false;
-        downloadZipFileFromResponse(response);
-    };
-
     combineTemplateCommits() {
         this.programmingExerciseService.combineTemplateRepositoryCommits(this.programmingExercise.id!).subscribe(
             () => {
@@ -188,5 +180,83 @@ export class ProgrammingExerciseDetailComponent implements OnInit, OnDestroy {
             },
             (error: HttpErrorResponse) => this.dialogErrorSource.next(error.message),
         );
+    }
+
+    /**
+     * Unlock all repositories immediately. Asks for confirmation.
+     */
+    handleUnlockAllRepositories() {
+        const modalRef = this.modalService.open(ConfirmAutofocusModalComponent, { keyboard: true, size: 'lg' });
+        modalRef.componentInstance.title = 'artemisApp.programmingExercise.unlockAllRepositories';
+        modalRef.componentInstance.text = this.translateService.instant('artemisApp.programmingExercise.unlockAllRepositoriesModalText');
+        modalRef.result.then(() => {
+            this.unlockAllRepositories();
+        });
+    }
+
+    /**
+     * Unlocks all repositories that belong to the exercise
+     */
+    private unlockAllRepositories() {
+        this.lockingOrUnlockingRepositories = true;
+        this.programmingExerciseService.unlockAllRepositories(this.programmingExercise.id!).subscribe(
+            (res) => {
+                this.jhiAlertService.addAlert(
+                    {
+                        type: 'success',
+                        msg: 'artemisApp.programmingExercise.unlockAllRepositoriesSuccess',
+                        params: { number: res?.body },
+                        timeout: 10000,
+                    },
+                    [],
+                );
+                this.lockingOrUnlockingRepositories = false;
+            },
+            (err: HttpErrorResponse) => {
+                this.lockingOrUnlockingRepositories = false;
+                this.onError(err);
+            },
+        );
+    }
+
+    /**
+     * Lock all repositories immediately. Asks for confirmation.
+     */
+    handleLockAllRepositories() {
+        const modalRef = this.modalService.open(ConfirmAutofocusModalComponent, { keyboard: true, size: 'lg' });
+        modalRef.componentInstance.title = 'artemisApp.programmingExercise.lockAllRepositories';
+        modalRef.componentInstance.text = this.translateService.instant('artemisApp.programmingExercise.lockAllRepositoriesModalText');
+        modalRef.result.then(() => {
+            this.lockAllRepositories();
+        });
+    }
+
+    /**
+     * Locks all repositories that belong to the exercise
+     */
+    private lockAllRepositories() {
+        this.lockingOrUnlockingRepositories = true;
+        this.programmingExerciseService.lockAllRepositories(this.programmingExercise.id!).subscribe(
+            (res) => {
+                this.jhiAlertService.addAlert(
+                    {
+                        type: 'success',
+                        msg: 'artemisApp.programmingExercise.lockAllRepositoriesSuccess',
+                        params: { number: res?.body },
+                        timeout: 10000,
+                    },
+                    [],
+                );
+                this.lockingOrUnlockingRepositories = false;
+            },
+            (err: HttpErrorResponse) => {
+                this.lockingOrUnlockingRepositories = false;
+                this.onError(err);
+            },
+        );
+    }
+
+    private onError(error: HttpErrorResponse) {
+        this.jhiAlertService.error(error.message);
     }
 }

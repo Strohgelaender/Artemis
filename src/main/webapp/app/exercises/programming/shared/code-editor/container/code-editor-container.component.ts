@@ -49,6 +49,8 @@ export class CodeEditorContainerComponent implements ComponentCanDeactivate {
     @Input()
     isTutorAssessment = false;
     @Input()
+    highlightFileChanges = false;
+    @Input()
     readOnlyManualFeedback = false;
     @Output()
     onResizeEditorInstructions = new EventEmitter<void>();
@@ -57,7 +59,11 @@ export class CodeEditorContainerComponent implements ComponentCanDeactivate {
     @Output()
     onFileChanged = new EventEmitter<void>();
     @Output()
+    onSelectedFileChanged = new EventEmitter<string>();
+    @Output()
     onUpdateFeedback = new EventEmitter<Feedback[]>();
+    @Output()
+    onFileLoad = new EventEmitter<string>();
 
     /** Work in Progress: temporary properties needed to get first prototype working */
 
@@ -150,6 +156,10 @@ export class CodeEditorContainerComponent implements ComponentCanDeactivate {
         this.onFileChanged.emit();
     }
 
+    onSelectedFileChange(selectedFile: string) {
+        this.onSelectedFileChanged.emit(selectedFile);
+    }
+
     /**
      * When files were saved, check which could be saved and set unsavedFiles to update the ui.
      * Files that could not be saved will show an error in the header.
@@ -188,6 +198,10 @@ export class CodeEditorContainerComponent implements ComponentCanDeactivate {
 
     updateFeedback(feedbacks: Feedback[]) {
         this.onUpdateFeedback.emit(feedbacks);
+    }
+
+    fileLoad(selectedFile: string) {
+        this.onFileLoad.emit(selectedFile);
     }
 
     /**

@@ -72,9 +72,8 @@
                     <span class="d-none d-md-inline" jhiTranslate="entity.action.manageHints">Manage Hints</span>
                 </button>
 
-                <button [jhiFeatureToggle]="FeatureToggle.PROGRAMMING_EXERCISES" type="button" (click)="checkPlagiarism()" class="btn btn-primary btn-sm mr-1">
+                <button [jhiFeatureToggle]="FeatureToggle.PROGRAMMING_EXERCISES" class="btn btn-primary btn-sm mr-1" routerLink="plagiarism">
                     <span jhiTranslate="artemisApp.programmingExercise.checkPlagiarism">Check Plagiarism</span>
-                    <span *ngIf="this.checkPlagiarismInProgress" class="mr-1"><fa-icon [icon]="'circle-notch'" spin="true"></fa-icon></span>
                 </button>
 
                 <button
@@ -135,6 +134,28 @@
                     </button>
                     <fa-icon [icon]="'question-circle'" class="text-secondary" ngbTooltip="{{ 'artemisApp.programmingExercise.structureTestOracleWarning' | translate }}"></fa-icon>
                 </span>
+                <button
+                    id="unlockAllRepositoriesButton"
+                    class="btn btn-danger btn-sm mr-1"
+                    (click)="handleUnlockAllRepositories()"
+                    *ngIf="programmingExercise.isAtLeastInstructor"
+                    [disabled]="lockingOrUnlockingRepositories"
+                >
+                    <span *ngIf="lockingOrUnlockingRepositories" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <fa-icon [icon]="'exclamation-triangle'" class="text-warning"></fa-icon>
+                    <span jhiTranslate="artemisApp.programmingExercise.unlockAllRepositories">Unlock all repositories</span>
+                </button>
+                <button
+                    id="lockAllRepositoriesButton"
+                    class="btn btn-danger btn-sm mr-1"
+                    (click)="handleLockAllRepositories()"
+                    *ngIf="programmingExercise.isAtLeastInstructor"
+                    [disabled]="lockingOrUnlockingRepositories"
+                >
+                    <span *ngIf="lockingOrUnlockingRepositories" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <fa-icon [icon]="'exclamation-triangle'" class="text-warning"></fa-icon>
+                    <span jhiTranslate="artemisApp.programmingExercise.lockAllRepositories">Lock all repositories</span>
+                </button>
             </div>
             <dl class="row-md jh-entity-details">
                 <jhi-exercise-details [exercise]="programmingExercise"></jhi-exercise-details>
@@ -200,11 +221,11 @@
                 <dd>
                     <span>{{ programmingExercise.publishBuildPlanUrl }}</span>
                 </dd>
-                <dt><span jhiTranslate="artemisApp.programmingExercise.allowOfflineIde">Allow Offline IDE</span></dt>
+                <dt><span jhiTranslate="artemisApp.programmingExercise.allowOfflineIde.title">Allow Offline IDE</span></dt>
                 <dd>
                     <span>{{ programmingExercise.allowOfflineIde }}</span>
                 </dd>
-                <dt><span jhiTranslate="artemisApp.programmingExercise.allowOnlineEditor">Allow Online Editor</span></dt>
+                <dt><span jhiTranslate="artemisApp.programmingExercise.allowOnlineEditor.title">Allow Online Editor</span></dt>
                 <dd>
                     <span>{{ programmingExercise.allowOnlineEditor }}</span>
                 </dd>

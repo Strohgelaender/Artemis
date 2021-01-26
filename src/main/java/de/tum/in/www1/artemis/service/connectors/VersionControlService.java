@@ -1,12 +1,10 @@
 package de.tum.in.www1.artemis.service.connectors;
 
-import java.net.URL;
 import java.util.Set;
 
-import de.tum.in.www1.artemis.domain.Commit;
-import de.tum.in.www1.artemis.domain.ProgrammingExercise;
-import de.tum.in.www1.artemis.domain.User;
-import de.tum.in.www1.artemis.domain.VcsRepositoryUrl;
+import javax.annotation.Nullable;
+
+import de.tum.in.www1.artemis.domain.*;
 import de.tum.in.www1.artemis.domain.participation.ProgrammingExerciseParticipation;
 import de.tum.in.www1.artemis.exception.VersionControlException;
 
@@ -20,7 +18,7 @@ public interface VersionControlService {
      * @param users one user in an individual exercise, multiple users for a team exercise
      * @param allowAccess this determines if the users should get access to the repository directly. You normally want this to be true.
      */
-    void configureRepository(ProgrammingExercise exercise, URL repositoryUrl, Set<User> users, boolean allowAccess);
+    void configureRepository(ProgrammingExercise exercise, VcsRepositoryUrl repositoryUrl, Set<User> users, boolean allowAccess);
 
     /**
      * Creates all necessary webhooks from the VCS to any other system (e.g. Artemis, CI) on pushes to the specified
@@ -49,7 +47,7 @@ public interface VersionControlService {
      *
      * @param repositoryUrl of the repository that should be deleted
      */
-    void deleteRepository(URL repositoryUrl);
+    void deleteRepository(VcsRepositoryUrl repositoryUrl);
 
     /**
      * Get the clone URL used for cloning
@@ -63,10 +61,10 @@ public interface VersionControlService {
     /**
      * Check if the given repository url is valid and accessible.
      *
-     * @param repositoryUrl repository URL
+     * @param repositoryUrl the VCS repository URL
      * @return whether the repository is valid
      */
-    Boolean repositoryUrlIsValid(URL repositoryUrl);
+    Boolean repositoryUrlIsValid(@Nullable VcsRepositoryUrl repositoryUrl);
 
     /**
      * Get the last commit details that are included in the given requestBody that notifies about a push
@@ -101,7 +99,7 @@ public interface VersionControlService {
      * @param repositoryUrl The repository url
      * @return The repository name
      */
-    String getRepositoryName(URL repositoryUrl);
+    String getRepositoryName(VcsRepositoryUrl repositoryUrl);
 
     /**
      * Checks if the project with the given projectKey already exists
@@ -113,23 +111,11 @@ public interface VersionControlService {
     boolean checkIfProjectExists(String projectKey, String projectName);
 
     /**
-     * Forks a repository from one project to another one. The project can be the same.
-     *
-     * @param sourceProjectKey The key of the template project (normally based on the course and exercise short name)
-     * @param sourceRepositoryName The name of the repository which should be forked
-     * @param targetProjectKey The key of the target project to which to copy the new plan to
-     * @param targetRepositoryName The desired name of the target repository
-     * @return The URL for forking the repository
-     * @throws VersionControlException if the repository could not be forked on the VCS server (e.g. because the source repo does not exist)
-     */
-    VcsRepositoryUrl forkRepository(String sourceProjectKey, String sourceRepositoryName, String targetProjectKey, String targetRepositoryName) throws VersionControlException;
-
-    /**
      * Copies a repository from one project to another one. The project can be the same.
      *
-     * @param sourceProjectKey The key of the template project (normally based on the course and exercise short name)
+     * @param sourceProjectKey     The key of the template project (normally based on the course and exercise short name)
      * @param sourceRepositoryName The name of the repository which should be copied
-     * @param targetProjectKey The key of the target project to which to copy the new plan to
+     * @param targetProjectKey     The key of the target project to which to copy the new plan to
      * @param targetRepositoryName The desired name of the target repository
      * @return The URL for cloning the repository
      * @throws VersionControlException if the repository could not be copied on the VCS server (e.g. because the source repo does not exist)
@@ -142,7 +128,7 @@ public interface VersionControlService {
      * @param repositoryUrl     The repository url of the repository to which to add the user. It contains the project key & the repository name.
      * @param user              User which to add to the repository
      */
-    void addMemberToRepository(URL repositoryUrl, User user);
+    void addMemberToRepository(VcsRepositoryUrl repositoryUrl, User user);
 
     /**
      * Remove the user from the repository
@@ -150,7 +136,7 @@ public interface VersionControlService {
      * @param repositoryUrl     The repository url of the repository from which to remove the user. It contains the project key & the repository name.
      * @param user              User which to remove from the repository
      */
-    void removeMemberFromRepository(URL repositoryUrl, User user);
+    void removeMemberFromRepository(VcsRepositoryUrl repositoryUrl, User user);
 
     /**
      * Removes the user's write permissions for a repository.
@@ -160,7 +146,7 @@ public interface VersionControlService {
      * @param users             Set of users for which to change permissions
      * @throws VersionControlException        If the communication with the VCS fails.
      */
-    void setRepositoryPermissionsToReadOnly(URL repositoryUrl, String projectKey, Set<User> users) throws VersionControlException;
+    void setRepositoryPermissionsToReadOnly(VcsRepositoryUrl repositoryUrl, String projectKey, Set<User> users) throws VersionControlException;
 
     /**
      * Unprotects a branch from the repository, so that the history can be changed (important for combine template commits).
@@ -169,7 +155,7 @@ public interface VersionControlService {
      * @param branch            The name of the branch to unprotect (e.g "master")
      * @throws VersionControlException      If the communication with the VCS fails.
      */
-    void unprotectBranch(URL repositoryUrl, String branch) throws VersionControlException;
+    void unprotectBranch(VcsRepositoryUrl repositoryUrl, String branch) throws VersionControlException;
 
     /**
      * Checks if the underlying VCS server is up and running and gives some additional information about the running

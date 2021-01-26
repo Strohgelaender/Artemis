@@ -30,94 +30,16 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
-import de.tum.in.www1.artemis.domain.Attachment;
-import de.tum.in.www1.artemis.domain.Authority;
-import de.tum.in.www1.artemis.domain.Complaint;
-import de.tum.in.www1.artemis.domain.Course;
-import de.tum.in.www1.artemis.domain.ExampleSubmission;
-import de.tum.in.www1.artemis.domain.Exercise;
-import de.tum.in.www1.artemis.domain.ExerciseHint;
-import de.tum.in.www1.artemis.domain.Feedback;
-import de.tum.in.www1.artemis.domain.FileUploadExercise;
-import de.tum.in.www1.artemis.domain.FileUploadSubmission;
-import de.tum.in.www1.artemis.domain.GradingCriterion;
-import de.tum.in.www1.artemis.domain.GradingInstruction;
-import de.tum.in.www1.artemis.domain.Lecture;
-import de.tum.in.www1.artemis.domain.ProgrammingExercise;
-import de.tum.in.www1.artemis.domain.ProgrammingExerciseTestCase;
-import de.tum.in.www1.artemis.domain.ProgrammingSubmission;
-import de.tum.in.www1.artemis.domain.Result;
-import de.tum.in.www1.artemis.domain.StudentQuestion;
-import de.tum.in.www1.artemis.domain.Submission;
-import de.tum.in.www1.artemis.domain.Team;
-import de.tum.in.www1.artemis.domain.TextBlock;
-import de.tum.in.www1.artemis.domain.TextExercise;
-import de.tum.in.www1.artemis.domain.TextSubmission;
-import de.tum.in.www1.artemis.domain.User;
+import de.tum.in.www1.artemis.domain.*;
 import de.tum.in.www1.artemis.domain.enumeration.*;
 import de.tum.in.www1.artemis.domain.exam.Exam;
 import de.tum.in.www1.artemis.domain.exam.ExerciseGroup;
 import de.tum.in.www1.artemis.domain.exam.StudentExam;
 import de.tum.in.www1.artemis.domain.modeling.ModelingExercise;
 import de.tum.in.www1.artemis.domain.modeling.ModelingSubmission;
-import de.tum.in.www1.artemis.domain.participation.Participation;
-import de.tum.in.www1.artemis.domain.participation.ProgrammingExerciseStudentParticipation;
-import de.tum.in.www1.artemis.domain.participation.SolutionProgrammingExerciseParticipation;
-import de.tum.in.www1.artemis.domain.participation.StudentParticipation;
-import de.tum.in.www1.artemis.domain.participation.TemplateProgrammingExerciseParticipation;
-import de.tum.in.www1.artemis.domain.participation.TutorParticipation;
-import de.tum.in.www1.artemis.domain.quiz.AnswerOption;
-import de.tum.in.www1.artemis.domain.quiz.DragAndDropMapping;
-import de.tum.in.www1.artemis.domain.quiz.DragAndDropQuestion;
-import de.tum.in.www1.artemis.domain.quiz.DragAndDropSubmittedAnswer;
-import de.tum.in.www1.artemis.domain.quiz.DragItem;
-import de.tum.in.www1.artemis.domain.quiz.DropLocation;
-import de.tum.in.www1.artemis.domain.quiz.MultipleChoiceQuestion;
-import de.tum.in.www1.artemis.domain.quiz.MultipleChoiceSubmittedAnswer;
-import de.tum.in.www1.artemis.domain.quiz.QuizExercise;
-import de.tum.in.www1.artemis.domain.quiz.QuizQuestion;
-import de.tum.in.www1.artemis.domain.quiz.QuizSubmission;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerMapping;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerQuestion;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerSolution;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerSpot;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerSubmittedAnswer;
-import de.tum.in.www1.artemis.domain.quiz.ShortAnswerSubmittedText;
-import de.tum.in.www1.artemis.domain.quiz.SubmittedAnswer;
-import de.tum.in.www1.artemis.repository.AttachmentRepository;
-import de.tum.in.www1.artemis.repository.AuthorityRepository;
-import de.tum.in.www1.artemis.repository.ComplaintRepository;
-import de.tum.in.www1.artemis.repository.ComplaintResponseRepository;
-import de.tum.in.www1.artemis.repository.CourseRepository;
-import de.tum.in.www1.artemis.repository.ExamRepository;
-import de.tum.in.www1.artemis.repository.ExampleSubmissionRepository;
-import de.tum.in.www1.artemis.repository.ExerciseGroupRepository;
-import de.tum.in.www1.artemis.repository.ExerciseHintRepository;
-import de.tum.in.www1.artemis.repository.ExerciseRepository;
-import de.tum.in.www1.artemis.repository.FeedbackRepository;
-import de.tum.in.www1.artemis.repository.FileUploadSubmissionRepository;
-import de.tum.in.www1.artemis.repository.GroupNotificationRepository;
-import de.tum.in.www1.artemis.repository.LectureRepository;
-import de.tum.in.www1.artemis.repository.ModelingSubmissionRepository;
-import de.tum.in.www1.artemis.repository.ProgrammingExerciseRepository;
-import de.tum.in.www1.artemis.repository.ProgrammingExerciseStudentParticipationRepository;
-import de.tum.in.www1.artemis.repository.ProgrammingExerciseTestCaseRepository;
-import de.tum.in.www1.artemis.repository.ProgrammingExerciseTestRepository;
-import de.tum.in.www1.artemis.repository.ProgrammingSubmissionRepository;
-import de.tum.in.www1.artemis.repository.ResultRepository;
-import de.tum.in.www1.artemis.repository.SolutionProgrammingExerciseParticipationRepository;
-import de.tum.in.www1.artemis.repository.StaticCodeAnalysisCategoryRepository;
-import de.tum.in.www1.artemis.repository.StudentExamRepository;
-import de.tum.in.www1.artemis.repository.StudentParticipationRepository;
-import de.tum.in.www1.artemis.repository.StudentQuestionRepository;
-import de.tum.in.www1.artemis.repository.SubmissionRepository;
-import de.tum.in.www1.artemis.repository.SubmissionVersionRepository;
-import de.tum.in.www1.artemis.repository.TeamRepository;
-import de.tum.in.www1.artemis.repository.TemplateProgrammingExerciseParticipationRepository;
-import de.tum.in.www1.artemis.repository.TextBlockRepository;
-import de.tum.in.www1.artemis.repository.TextSubmissionRepository;
-import de.tum.in.www1.artemis.repository.TutorParticipationRepository;
-import de.tum.in.www1.artemis.repository.UserRepository;
+import de.tum.in.www1.artemis.domain.participation.*;
+import de.tum.in.www1.artemis.domain.quiz.*;
+import de.tum.in.www1.artemis.repository.*;
 import de.tum.in.www1.artemis.security.AuthoritiesConstants;
 import de.tum.in.www1.artemis.service.AssessmentService;
 import de.tum.in.www1.artemis.service.ModelingSubmissionService;
@@ -338,6 +260,12 @@ public class DatabaseUtilService {
 
     public List<Team> addTeamsForExercise(Exercise exercise, int numberOfTeams, User owner) {
         return addTeamsForExercise(exercise, "team", numberOfTeams, owner);
+    }
+
+    public List<Team> addTeamsForExerciseFixedTeamSize(Exercise exercise, int numberOfTeams, User owner, int noOfStudentsPerTeam) {
+        List<Team> teams = ModelFactory.generateTeamsForExerciseFixedTeamSize(exercise, "team", "student", numberOfTeams, owner, null, "R", noOfStudentsPerTeam);
+        userRepo.saveAll(teams.stream().map(Team::getStudents).flatMap(Collection::stream).collect(Collectors.toList()));
+        return teamRepo.saveAll(teams);
     }
 
     public Team addTeamForExercise(Exercise exercise, User owner) {
@@ -830,7 +758,7 @@ public class DatabaseUtilService {
             else {
                 submission = markProgrammingParticipationForTestRun((ProgrammingExercise) exercise, instructor.getLogin());
             }
-            assertThat(exercise.hasExerciseGroup()).isTrue();
+            assertThat(exercise.isExamExercise()).isTrue();
             assertThat(submission.getLatestResult().getAssessor().getLogin()).isEqualTo(instructor.getLogin());
             assertThat(((StudentParticipation) submission.getParticipation()).getStudent().get().getLogin()).isEqualTo(instructor.getLogin());
         }
@@ -843,6 +771,7 @@ public class DatabaseUtilService {
         exam.setRandomizeExerciseOrder(true);
         exam.setStartDate(ZonedDateTime.now().plusHours(2));
         exam.setEndDate(ZonedDateTime.now().plusHours(4));
+        exam.setMaxPoints(20);
         exam = examRepository.save(exam);
 
         // add exercise groups: 3 mandatory, 2 optional
@@ -905,6 +834,7 @@ public class DatabaseUtilService {
         exam.setVisibleDate(visibleDate);
         exam.setStartDate(startDate);
         exam.setEndDate(endDate);
+        exam.setNumberOfCorrectionRoundsInExam(1);
         examRepository.save(exam);
         return exam;
     }
@@ -963,13 +893,18 @@ public class DatabaseUtilService {
         ModelFactory.generateExerciseGroup(true, exam); // quiz
         ModelFactory.generateExerciseGroup(true, exam); // file upload
         ModelFactory.generateExerciseGroup(true, exam); // modeling
-        exam.setNumberOfExercisesInExam(4);
+        ModelFactory.generateExerciseGroup(true, exam); // bonus text
+        ModelFactory.generateExerciseGroup(true, exam); // not included text
+        exam.setNumberOfExercisesInExam(6);
+        exam.setMaxPoints(24);
         exam = examRepository.save(exam);
         // NOTE: we have to reassign, otherwise we get problems, because the objects have changed
         var exerciseGroup0 = exam.getExerciseGroups().get(0);
         var exerciseGroup1 = exam.getExerciseGroups().get(1);
         var exerciseGroup2 = exam.getExerciseGroups().get(2);
         var exerciseGroup3 = exam.getExerciseGroups().get(3);
+        var exerciseGroup4 = exam.getExerciseGroups().get(4);
+        var exerciseGroup5 = exam.getExerciseGroups().get(5);
 
         TextExercise textExercise1 = ModelFactory.generateTextExerciseForExam(exerciseGroup0);
         TextExercise textExercise2 = ModelFactory.generateTextExerciseForExam(exerciseGroup0);
@@ -995,18 +930,29 @@ public class DatabaseUtilService {
         exerciseRepo.save(modelingExercise1);
         exerciseRepo.save(modelingExercise2);
 
+        TextExercise bonusTextExercise = ModelFactory.generateTextExerciseForExam(exerciseGroup4);
+        bonusTextExercise.setIncludedInOverallScore(IncludedInOverallScore.INCLUDED_AS_BONUS);
+        exerciseGroup4.setExercises(Set.of(bonusTextExercise));
+        exerciseRepo.save(bonusTextExercise);
+
+        TextExercise notIncludedTextExercise = ModelFactory.generateTextExerciseForExam(exerciseGroup5);
+        notIncludedTextExercise.setIncludedInOverallScore(IncludedInOverallScore.NOT_INCLUDED);
+        exerciseGroup5.setExercises(Set.of(notIncludedTextExercise));
+        exerciseRepo.save(notIncludedTextExercise);
+
         if (withProgrammingExercise) {
             ModelFactory.generateExerciseGroup(true, exam); // programming
-            exam.setNumberOfExercisesInExam(5);
+            exam.setNumberOfExercisesInExam(7);
+            exam.setMaxPoints(29);
             exam = examRepository.save(exam);
-            var exerciseGroup4 = exam.getExerciseGroups().get(4);
+            var exerciseGroup6 = exam.getExerciseGroups().get(6);
             // Programming exercises need a proper setup for 'prepare exam start' to work
-            ProgrammingExercise programmingExercise1 = ModelFactory.generateProgrammingExerciseForExam(exerciseGroup4);
+            ProgrammingExercise programmingExercise1 = ModelFactory.generateProgrammingExerciseForExam(exerciseGroup6);
             exerciseRepo.save(programmingExercise1);
             addTemplateParticipationForProgrammingExercise(programmingExercise1);
             addSolutionParticipationForProgrammingExercise(programmingExercise1);
 
-            exerciseGroup4.setExercises(Set.of(programmingExercise1));
+            exerciseGroup6.setExercises(Set.of(programmingExercise1));
         }
 
         return exam;
@@ -1140,13 +1086,26 @@ public class DatabaseUtilService {
         if (existingParticipation.isPresent()) {
             return existingParticipation.get();
         }
-        ProgrammingExerciseStudentParticipation participation = preconfigurationOfParticipation(exercise, login);
+        ProgrammingExerciseStudentParticipation participation = configureIndividualParticipation(exercise, login);
         final var repoName = (exercise.getProjectKey() + "-" + login).toLowerCase();
         participation.setRepositoryUrl(String.format("http://some.test.url/scm/%s/%s.git", exercise.getProjectKey(), repoName));
         participation = programmingExerciseStudentParticipationRepo.save(participation);
 
         return (ProgrammingExerciseStudentParticipation) studentParticipationRepo.findWithEagerSubmissionsAndResultsAssessorsById(participation.getId()).get();
+    }
 
+    public ProgrammingExerciseStudentParticipation addTeamParticipationForProgrammingExercise(ProgrammingExercise exercise, Team team) {
+
+        final var existingParticipation = programmingExerciseStudentParticipationRepo.findByExerciseIdAndTeamId(exercise.getId(), team.getId());
+        if (existingParticipation.isPresent()) {
+            return existingParticipation.get();
+        }
+        ProgrammingExerciseStudentParticipation participation = configureTeamParticipation(exercise, team);
+        final var repoName = (exercise.getProjectKey() + "-" + team.getShortName()).toLowerCase();
+        participation.setRepositoryUrl(String.format("http://some.test.url/scm/%s/%s.git", exercise.getProjectKey(), repoName));
+        participation = programmingExerciseStudentParticipationRepo.save(participation);
+
+        return (ProgrammingExerciseStudentParticipation) studentParticipationRepo.findWithEagerSubmissionsAndResultsAssessorsById(participation.getId()).get();
     }
 
     public ProgrammingExerciseStudentParticipation addStudentParticipationForProgrammingExerciseForLocalRepo(ProgrammingExercise exercise, String login, URL localRepoPath) {
@@ -1154,7 +1113,7 @@ public class DatabaseUtilService {
         if (existingParticipation.isPresent()) {
             return existingParticipation.get();
         }
-        ProgrammingExerciseStudentParticipation participation = preconfigurationOfParticipation(exercise, login);
+        ProgrammingExerciseStudentParticipation participation = configureIndividualParticipation(exercise, login);
         final var repoName = (exercise.getProjectKey() + "-" + login).toLowerCase();
         participation.setRepositoryUrl(String.format(localRepoPath.toString() + "%s/%s.git", exercise.getProjectKey(), repoName));
         participation = programmingExerciseStudentParticipationRepo.save(participation);
@@ -1162,12 +1121,23 @@ public class DatabaseUtilService {
         return (ProgrammingExerciseStudentParticipation) studentParticipationRepo.findWithEagerSubmissionsAndResultsAssessorsById(participation.getId()).get();
     }
 
-    private ProgrammingExerciseStudentParticipation preconfigurationOfParticipation(ProgrammingExercise exercise, String login) {
+    private ProgrammingExerciseStudentParticipation configureIndividualParticipation(ProgrammingExercise exercise, String login) {
         final var user = getUserByLogin(login);
         var participation = new ProgrammingExerciseStudentParticipation();
         final var buildPlanId = exercise.getProjectKey().toUpperCase() + "-" + login.toUpperCase();
         participation.setInitializationDate(ZonedDateTime.now());
         participation.setParticipant(user);
+        participation.setBuildPlanId(buildPlanId);
+        participation.setProgrammingExercise(exercise);
+        participation.setInitializationState(InitializationState.INITIALIZED);
+        return participation;
+    }
+
+    private ProgrammingExerciseStudentParticipation configureTeamParticipation(ProgrammingExercise exercise, Team team) {
+        var participation = new ProgrammingExerciseStudentParticipation();
+        final var buildPlanId = exercise.getProjectKey().toUpperCase() + "-" + team.getShortName().toUpperCase();
+        participation.setInitializationDate(ZonedDateTime.now());
+        participation.setParticipant(team);
         participation.setBuildPlanId(buildPlanId);
         participation.setProgrammingExercise(exercise);
         participation.setInitializationState(InitializationState.INITIALIZED);
@@ -1239,6 +1209,12 @@ public class DatabaseUtilService {
         return resultRepo.save(result);
     }
 
+    public Result addFeedbackToResult(Feedback feedback, Result result) {
+        feedbackRepo.save(feedback);
+        result.addFeedback(feedback);
+        return resultRepo.save(result);
+    }
+
     public Result addFeedbackToResults(Result result) {
         List<Feedback> feedback = ModelFactory.generateStaticCodeAnalysisFeedbackList(5);
         feedback.addAll(ModelFactory.generateFeedback());
@@ -1256,7 +1232,7 @@ public class DatabaseUtilService {
         result.setSubmission(submission);
         submission.addResult(result);
         var savedSubmission = submissionRepository.save(submission);
-        return submissionRepository.findWithEagerResultsById(savedSubmission.getId()).orElseThrow();
+        return submissionRepository.findWithEagerResultsAndAssessorById(savedSubmission.getId()).orElseThrow();
     }
 
     public Submission addResultToSubmission(Submission submission, AssessmentType assessmentType) {
@@ -1272,6 +1248,7 @@ public class DatabaseUtilService {
     }
 
     public Exercise addMaxScoreAndBonusPointsToExercise(Exercise exercise) {
+        exercise.setIncludedInOverallScore(IncludedInOverallScore.INCLUDED_COMPLETELY);
         exercise.setMaxScore(100.0);
         exercise.setBonusPoints(10.0);
         return exerciseRepo.save(exercise);
@@ -1366,13 +1343,17 @@ public class DatabaseUtilService {
         return programmingExercise;
     }
 
-    public ProgrammingSubmission createProgrammingSubmission(Participation participation, boolean buildFailed) {
+    public ProgrammingSubmission createProgrammingSubmission(Participation participation, boolean buildFailed, String commitHash) {
         ProgrammingSubmission programmingSubmission = ModelFactory.generateProgrammingSubmission(true);
         programmingSubmission.setBuildFailed(buildFailed);
         programmingSubmission.type(SubmissionType.MANUAL).submissionDate(ZonedDateTime.now());
-        programmingSubmission.setCommitHash(TestConstants.COMMIT_HASH_STRING);
+        programmingSubmission.setCommitHash(commitHash);
         programmingSubmission.setParticipation(participation);
         return submissionRepository.save(programmingSubmission);
+    }
+
+    public ProgrammingSubmission createProgrammingSubmission(Participation participation, boolean buildFailed) {
+        return createProgrammingSubmission(participation, buildFailed, TestConstants.COMMIT_HASH_STRING);
     }
 
     public TextExercise addCourseExamExerciseGroupWithOneTextExercise() {
@@ -1525,16 +1506,24 @@ public class DatabaseUtilService {
     }
 
     public Course addCourseWithOneProgrammingExercise(boolean enableStaticCodeAnalysis) {
+        return addCourseWithOneProgrammingExercise(enableStaticCodeAnalysis, ProgrammingLanguage.JAVA);
+    }
+
+    public Course addCourseWithOneProgrammingExercise(boolean enableStaticCodeAnalysis, ProgrammingLanguage programmingLanguage) {
         var course = ModelFactory.generateCourse(null, pastTimestamp, futureFutureTimestamp, new HashSet<>(), "tumuser", "tutor", "instructor");
         course = courseRepo.save(course);
-        var programmingExercise = addProgrammingExerciseToCourse(course, enableStaticCodeAnalysis);
+        var programmingExercise = addProgrammingExerciseToCourse(course, enableStaticCodeAnalysis, programmingLanguage);
         assertThat(programmingExercise.getPresentationScoreEnabled()).as("presentation score is enabled").isTrue();
         return courseRepo.findWithEagerExercisesAndLecturesById(course.getId());
     }
 
     public ProgrammingExercise addProgrammingExerciseToCourse(Course course, boolean enableStaticCodeAnalysis) {
+        return addProgrammingExerciseToCourse(course, enableStaticCodeAnalysis, ProgrammingLanguage.JAVA);
+    }
+
+    public ProgrammingExercise addProgrammingExerciseToCourse(Course course, boolean enableStaticCodeAnalysis, ProgrammingLanguage programmingLanguage) {
         var programmingExercise = (ProgrammingExercise) new ProgrammingExercise().course(course);
-        populateProgrammingExercise(programmingExercise, "TSTEXC", "Programming", enableStaticCodeAnalysis);
+        populateProgrammingExercise(programmingExercise, "TSTEXC", "Programming", enableStaticCodeAnalysis, programmingLanguage);
         programmingExercise.setPresentationScoreEnabled(course.getPresentationScore() != 0);
 
         programmingExercise = programmingExerciseRepository.save(programmingExercise);
@@ -1574,7 +1563,12 @@ public class DatabaseUtilService {
     }
 
     private void populateProgrammingExercise(ProgrammingExercise programmingExercise, String shortName, String title, boolean enableStaticCodeAnalysis) {
-        programmingExercise.setProgrammingLanguage(ProgrammingLanguage.JAVA);
+        populateProgrammingExercise(programmingExercise, shortName, title, enableStaticCodeAnalysis, ProgrammingLanguage.JAVA);
+    }
+
+    private void populateProgrammingExercise(ProgrammingExercise programmingExercise, String shortName, String title, boolean enableStaticCodeAnalysis,
+            ProgrammingLanguage programmingLanguage) {
+        programmingExercise.setProgrammingLanguage(programmingLanguage);
         programmingExercise.setShortName(shortName);
         programmingExercise.generateAndSetProjectKey();
         programmingExercise.setReleaseDate(ZonedDateTime.now().plusDays(1));
@@ -1588,14 +1582,24 @@ public class DatabaseUtilService {
         programmingExercise.setAssessmentType(AssessmentType.AUTOMATIC);
         programmingExercise.setGradingInstructions("Lorem Ipsum");
         programmingExercise.setTitle(title);
-        programmingExercise.setProjectType(ProjectType.ECLIPSE);
+        if (programmingLanguage == ProgrammingLanguage.JAVA) {
+            programmingExercise.setProjectType(ProjectType.ECLIPSE);
+        }
+        else {
+            programmingExercise.setProjectType(null);
+        }
         programmingExercise.setAllowOnlineEditor(true);
         programmingExercise.setStaticCodeAnalysisEnabled(enableStaticCodeAnalysis);
         if (enableStaticCodeAnalysis) {
             programmingExercise.setMaxStaticCodeAnalysisPenalty(40);
         }
-        // Note: package name not allowed for Swift, no separators are allowed
-        programmingExercise.setPackageName("de.test");
+        // Note: no separators are allowed for Swift package names
+        if (programmingLanguage == ProgrammingLanguage.SWIFT) {
+            programmingExercise.setPackageName("swiftTest");
+        }
+        else {
+            programmingExercise.setPackageName("de.test");
+        }
         programmingExercise.setDueDate(ZonedDateTime.now().plusDays(2));
         programmingExercise.setAssessmentDueDate(ZonedDateTime.now().plusDays(3));
         programmingExercise.setCategories(new HashSet<>(Set.of("cat1", "cat2")));
@@ -1685,7 +1689,11 @@ public class DatabaseUtilService {
     }
 
     public ProgrammingExercise addCourseWithOneProgrammingExerciseAndStaticCodeAnalysisCategories() {
-        Course course = addCourseWithOneProgrammingExercise(true);
+        return addCourseWithOneProgrammingExerciseAndStaticCodeAnalysisCategories(ProgrammingLanguage.JAVA);
+    }
+
+    public ProgrammingExercise addCourseWithOneProgrammingExerciseAndStaticCodeAnalysisCategories(ProgrammingLanguage programmingLanguage) {
+        Course course = addCourseWithOneProgrammingExercise(true, programmingLanguage);
         ProgrammingExercise programmingExercise = findProgrammingExerciseWithTitle(course.getExercises(), "Programming");
         programmingExercise = programmingExerciseRepository.save(programmingExercise);
 
@@ -1832,7 +1840,7 @@ public class DatabaseUtilService {
 
     public ModelingSubmission addModelingSubmission(ModelingExercise exercise, ModelingSubmission submission, String login) {
         StudentParticipation participation = createAndSaveParticipationForExercise(exercise, login);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         modelingSubmissionRepo.save(submission);
         studentParticipationRepo.save(participation);
@@ -1841,7 +1849,7 @@ public class DatabaseUtilService {
 
     public ModelingSubmission addModelingTeamSubmission(ModelingExercise exercise, ModelingSubmission submission, Team team) {
         StudentParticipation participation = addTeamParticipationForExercise(exercise, team.getId());
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         modelingSubmissionRepo.save(submission);
         studentParticipationRepo.save(participation);
@@ -1868,7 +1876,7 @@ public class DatabaseUtilService {
         StudentParticipation participation = addStudentParticipationForProgrammingExercise(exercise, login);
         submission = programmingSubmissionRepo.save(submission);
         Result result = resultRepo.save(new Result().participation(participation));
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         submission.addResult(result);
         submission = programmingSubmissionRepo.save(submission);
@@ -1914,14 +1922,14 @@ public class DatabaseUtilService {
         submission.setCommitHash(commitHash);
         resultRepo.save(result);
         result.setSubmission(submission);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         studentParticipationRepo.save(participation);
         return submissionRepository.save(submission);
     }
 
     public Submission addSubmission(Exercise exercise, Submission submission, String login) {
         StudentParticipation participation = createAndSaveParticipationForExercise(exercise, login);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         submissionRepository.save(submission);
         studentParticipationRepo.save(participation);
@@ -1929,7 +1937,7 @@ public class DatabaseUtilService {
     }
 
     public Submission addSubmission(StudentParticipation participation, Submission submission) {
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         submissionRepository.save(submission);
         studentParticipationRepo.save(participation);
@@ -1939,7 +1947,7 @@ public class DatabaseUtilService {
     public ModelingSubmission addModelingSubmissionWithResultAndAssessor(ModelingExercise exercise, ModelingSubmission submission, String login, String assessorLogin) {
 
         StudentParticipation participation = createAndSaveParticipationForExercise(exercise, login);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission = modelingSubmissionRepo.save(submission);
 
         Result result = new Result();
@@ -1962,7 +1970,7 @@ public class DatabaseUtilService {
 
     public ModelingSubmission addModelingSubmissionWithFinishedResultAndAssessor(ModelingExercise exercise, ModelingSubmission submission, String login, String assessorLogin) {
         StudentParticipation participation = createAndSaveParticipationForExercise(exercise, login);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission = modelingSubmissionRepo.save(submission);
         Result result = new Result();
         result.setAssessor(getUserByLogin(assessorLogin));
@@ -1980,7 +1988,7 @@ public class DatabaseUtilService {
 
     public FileUploadSubmission addFileUploadSubmission(FileUploadExercise fileUploadExercise, FileUploadSubmission fileUploadSubmission, String login) {
         StudentParticipation participation = createAndSaveParticipationForExercise(fileUploadExercise, login);
-        participation.addSubmissions(fileUploadSubmission);
+        participation.addSubmission(fileUploadSubmission);
         fileUploadSubmission.setParticipation(participation);
         fileUploadSubmissionRepo.save(fileUploadSubmission);
         studentParticipationRepo.save(participation);
@@ -1993,7 +2001,7 @@ public class DatabaseUtilService {
 
         submissionRepository.save(fileUploadSubmission);
 
-        participation.addSubmissions(fileUploadSubmission);
+        participation.addSubmission(fileUploadSubmission);
         Result result = new Result();
         result.setAssessor(getUserByLogin(assessorLogin));
         result.setScore(100L);
@@ -2021,7 +2029,7 @@ public class DatabaseUtilService {
 
     public TextSubmission saveTextSubmission(TextExercise exercise, TextSubmission submission, String login) {
         StudentParticipation participation = createAndSaveParticipationForExercise(exercise, login);
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         submission.setParticipation(participation);
         submission = textSubmissionRepo.save(submission);
         return submission;
@@ -2033,7 +2041,7 @@ public class DatabaseUtilService {
 
         submissionRepository.save(submission);
 
-        participation.addSubmissions(submission);
+        participation.addSubmission(submission);
         Result result = new Result();
         result.setAssessor(getUserByLogin(assessorLogin));
         result.setScore(100L);
@@ -2118,7 +2126,7 @@ public class DatabaseUtilService {
 
     public Result addModelingAssessmentForSubmission(ModelingExercise exercise, ModelingSubmission submission, String path, String login, boolean submit) throws Exception {
         List<Feedback> feedbackList = loadAssessmentFomResources(path);
-        Result result = assessmentService.saveManualAssessment(submission, feedbackList);
+        Result result = assessmentService.saveManualAssessment(submission, feedbackList, null);
         result.setParticipation(submission.getParticipation().results(null));
         result.setAssessor(getUserByLogin(login));
         resultRepo.save(result);
@@ -2129,14 +2137,24 @@ public class DatabaseUtilService {
     }
 
     public ExampleSubmission addExampleSubmission(ExampleSubmission exampleSubmission) {
+        Submission submission;
         if (exampleSubmission.getSubmission() instanceof ModelingSubmission) {
-            modelingSubmissionRepo.save((ModelingSubmission) exampleSubmission.getSubmission());
+            submission = modelingSubmissionRepo.save((ModelingSubmission) exampleSubmission.getSubmission());
         }
         else {
-            textSubmissionRepo.save((TextSubmission) exampleSubmission.getSubmission());
+            submission = textSubmissionRepo.save((TextSubmission) exampleSubmission.getSubmission());
         }
-
+        exampleSubmission.setSubmission(submission);
         return exampleSubmissionRepo.save(exampleSubmission);
+    }
+
+    public ComplaintResponse createInitialEmptyResponse(String loginOfTutor, Complaint complaint) {
+        ComplaintResponse complaintResponse = new ComplaintResponse();
+        complaintResponse.setComplaint(complaint);
+        User tutor = userRepo.findOneByLogin(loginOfTutor).get();
+        complaintResponse.setReviewer(tutor);
+        complaintResponse = complaintResponseRepo.saveAndFlush(complaintResponse);
+        return complaintResponse;
     }
 
     public List<Feedback> loadAssessmentFomResources(String path) throws Exception {
@@ -2214,7 +2232,7 @@ public class DatabaseUtilService {
 
     /**
      * Generates an example submission for a given model and exercise
-     * @param model given uml model for the example submission
+     * @param modelOrText given uml model for the example submission
      * @param exercise exercise for which the example submission is created
      * @param flagAsExampleSubmission true if the submission is an example submission
      * @return  created example submission
@@ -2225,7 +2243,7 @@ public class DatabaseUtilService {
 
     /**
      * Generates an example submission for a given model and exercise
-     * @param model given uml model for the example submission
+     * @param modelOrText given uml model for the example submission
      * @param exercise exercise for which the example submission is created
      * @param flagAsExampleSubmission true if the submission is an example submission
      * @param usedForTutorial true if the example submission is used for tutorial
@@ -2297,11 +2315,12 @@ public class DatabaseUtilService {
             for (var spot : ((ShortAnswerQuestion) question).getSpots()) {
                 ShortAnswerSubmittedText submittedText = new ShortAnswerSubmittedText();
                 submittedText.setSpot(spot);
+                var correctText = ((ShortAnswerQuestion) question).getCorrectSolutionForSpot(spot).iterator().next().getText();
                 if (correct) {
-                    submittedText.setText(((ShortAnswerQuestion) question).getCorrectSolutionForSpot(spot).iterator().next().getText());
+                    submittedText.setText(correctText);
                 }
                 else {
-                    submittedText.setText("wrong short answer");
+                    submittedText.setText(correctText.toUpperCase());
                 }
                 submittedAnswer.addSubmittedTexts(submittedText);
                 // also invoke remove once
@@ -2339,6 +2358,9 @@ public class DatabaseUtilService {
     public ShortAnswerQuestion createShortAnswerQuestion() {
         ShortAnswerQuestion sa = (ShortAnswerQuestion) new ShortAnswerQuestion().title("SA").score(2).text("This is a long answer text");
         sa.setScoringType(ScoringType.ALL_OR_NOTHING);
+        // TODO: we should test different values here
+        sa.setMatchLetterCase(true);
+        sa.setSimilarityValue(100);
 
         var shortAnswerSpot1 = new ShortAnswerSpot().spotNr(0).width(1);
         shortAnswerSpot1.setTempID(generateTempId());

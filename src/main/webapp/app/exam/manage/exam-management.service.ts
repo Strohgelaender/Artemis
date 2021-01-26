@@ -70,18 +70,6 @@ export class ExamManagementService {
     }
 
     /**
-     * Query exams of the given course via get request.
-     * @param courseId The course id.
-     * @param req The query request options.
-     */
-    query(courseId: number, req?: any): Observable<EntityArrayResponseType> {
-        const options = createRequestOption(req);
-        return this.http
-            .get<Exam[]>(`${this.resourceUrl}/${courseId}/exams`, { params: options, observe: 'response' })
-            .pipe(map((res: EntityArrayResponseType) => ExamManagementService.convertDateArrayFromServer(res)));
-    }
-
-    /**
      * Find all exams for the given course.
      * @param courseId The course id.
      */
@@ -246,6 +234,16 @@ export class ExamManagementService {
     }
 
     /**
+     * Assess all the modeling and text participations belonging to unsubmitted student exams
+     * @param courseId id of the course to which the exam belongs
+     * @param examId id of the exam
+     * @returns number of evaluated participations
+     */
+    assessUnsubmittedExamModelingAndTextParticipations(courseId: number, examId: number): Observable<HttpResponse<number>> {
+        return this.http.post<any>(`${this.resourceUrl}/${courseId}/exams/${examId}/student-exams/assess-unsubmitted-and-empty-student-exams`, {}, { observe: 'response' });
+    }
+
+    /**
      * Unlock all the programming exercises belonging to the exam
      * @param courseId id of the course to which the exam belongs
      * @param examId id of the exam for which the programming exercises should be unlocked
@@ -275,7 +273,7 @@ export class ExamManagementService {
         return this.http.put<ExerciseGroup[]>(`${this.resourceUrl}/${courseId}/exams/${examId}/exerciseGroupsOrder`, exerciseGroups, { observe: 'response' });
     }
 
-    private static convertDateFromClient(exam: Exam): Exam {
+    public static convertDateFromClient(exam: Exam): Exam {
         return Object.assign({}, exam, {
             startDate: exam.startDate && moment(exam.startDate).isValid() ? exam.startDate.toJSON() : undefined,
             endDate: exam.endDate && moment(exam.endDate).isValid() ? exam.endDate.toJSON() : undefined,

@@ -61,7 +61,7 @@
                         </div>
                     </ng-container>
                 </div>
-                <jhi-programming-exercise-plans-and-repositories-preview [programmingExercise]="programmingExercise"> </jhi-programming-exercise-plans-and-repositories-preview>
+                <jhi-programming-exercise-plans-and-repositories-preview [programmingExercise]="programmingExercise"></jhi-programming-exercise-plans-and-repositories-preview>
                 <div *ngIf="!isExamMode" class="form-group-narrow position-relative">
                     <div>
                         <label class="label-narrow" jhiTranslate="artemisApp.exercise.categories">Categories</label>
@@ -146,56 +146,58 @@
                         </label>
                         <jhi-help-icon placement="top" text="artemisApp.programmingExercise.timeline.timelineTooltip"></jhi-help-icon>
                     </div>
-                    <jhi-programming-exercise-lifecycle id="timeline" [exercise]="programmingExercise" [isExamMode]="isExamMode"> </jhi-programming-exercise-lifecycle>
+                    <jhi-programming-exercise-lifecycle id="timeline" [exercise]="programmingExercise" [isExamMode]="isExamMode"></jhi-programming-exercise-lifecycle>
+                </div>
+                <div class="form-group">
+                    <label class="form-control-label">{{ 'artemisApp.exercise.includedInOverallScoreLabel' | translate }}</label>
+                    <div>
+                        <jhi-included-in-overall-score-picker [(includedInOverallScore)]="programmingExercise.includedInOverallScore"></jhi-included-in-overall-score-picker>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col">
                         <div class="form-group-narrow">
-                            <label class="label-narrow" jhiTranslate="artemisApp.exercise.points" for="field_points">Regular Points</label>
+                            <label class="label-narrow" jhiTranslate="artemisApp.exercise.points" for="field_points">Points</label>
                             <input
                                 required
                                 type="number"
-                                [pattern]="maxScorePattern"
                                 class="form-control"
-                                min="1"
-                                max="9999"
+                                customMin="1"
+                                customMax="9999"
                                 name="points"
                                 id="field_points"
                                 [(ngModel)]="programmingExercise.maxScore"
                                 #maxScore="ngModel"
                             />
-                            <ng-container *ngFor="let e of maxScore.errors! | keyvalue | removekeys: ['required']">
-                                <div *ngIf="maxScore.invalid && (maxScore.dirty || maxScore.touched)" class="alert alert-danger">
-                                    <div [jhiTranslate]="'artemisApp.exercise.form.points' + '.' + e.key"></div>
-                                </div>
-                            </ng-container>
+                            <div *ngIf="maxScore?.invalid && (maxScore?.dirty || maxScore?.touched) && maxScore?.errors" class="alert alert-danger">
+                                {{ 'artemisApp.exercise.pointsError' | translate }}
+                            </div>
                         </div>
                     </div>
                     <div class="col">
-                        <div class="form-group-narrow">
+                        <div class="form-group-narrow" [hidden]="programmingExercise.includedInOverallScore !== IncludedInOverallScore.INCLUDED_COMPLETELY">
                             <label class="label-narrow" jhiTranslate="artemisApp.exercise.bonusPoints" for="field_bonusPoints">Bonus Points</label>
                             <input
-                                required
                                 type="number"
-                                [pattern]="maxScorePattern"
+                                [required]="programmingExercise.includedInOverallScore === IncludedInOverallScore.INCLUDED_COMPLETELY"
                                 class="form-control"
-                                min="1"
-                                max="9999"
+                                customMin="0"
+                                customMax="9999"
                                 name="bonusPoints"
                                 id="field_bonusPoints"
                                 [(ngModel)]="programmingExercise.bonusPoints"
                                 #bonusPoints="ngModel"
                             />
-                            <ng-container *ngFor="let e of bonusPoints.errors! | keyvalue | removekeys: ['required']">
-                                <div *ngIf="bonusPoints.invalid && (bonusPoints.dirty || bonusPoints.touched)" class="alert alert-danger">
-                                    <div [jhiTranslate]="'artemisApp.exercise.form.bonusPoints' + '.' + e.key"></div>
-                                </div>
-                            </ng-container>
+                            <div
+                                *ngIf="bonusPoints?.invalid && (bonusPoints?.dirty || bonusPoints?.touched) && bonusPoints?.errors"
+                                class="alert alert-danger"
+                                [hidden]="programmingExercise.includedInOverallScore !== IncludedInOverallScore.INCLUDED_COMPLETELY"
+                            >
+                                {{ 'artemisApp.exercise.bonusPointsError' | translate }}
+                            </div>
                         </div>
                     </div>
                 </div>
-                <!-- Static code analysis is only supported for JAVA at the moment.
-                Also this option can't be changed on edit or import because the build plans and the test repo are already set up-->
                 <div class="form-group mt-2" *ngIf="programmingExercise.programmingLanguage && staticCodeAnalysisAllowed">
                     <div class="form-check custom-control custom-checkbox">
                         <input
@@ -203,7 +205,7 @@
                             class="form-check-input custom-control-input"
                             id="field_staticCodeAnalysisEnabled"
                             name="staticCodeAnalysisEnabled"
-                            [disabled]="!!programmingExercise.id || programmingExercise.sequentialTestRuns"
+                            [disabled]="programmingExercise.sequentialTestRuns || (!isImport && programmingExercise.id)"
                             [(ngModel)]="programmingExercise.staticCodeAnalysisEnabled"
                             (change)="onStaticCodeAnalysisChanged()"
                         />
@@ -327,7 +329,7 @@
                 </div>
                 <div class="form-group-narrow">
                     <div class="form-check">
-                        <label class="form-check-label" for="field_allowOfflineIde">
+                        <label [class]="!validIdeSelection() ? 'form-check-label text-danger' : 'form-check-label'" for="field_allowOfflineIde">
                             <input
                                 class="form-check-input"
                                 type="checkbox"
@@ -336,13 +338,20 @@
                                 [(ngModel)]="programmingExercise.allowOfflineIde"
                                 checked
                             />
-                            <span jhiTranslate="artemisApp.programmingExercise.allowOfflineIde">Allow Offline IDE</span>
+                            <span jhiTranslate="artemisApp.programmingExercise.allowOfflineIde.title">Allow Offline IDE</span>
+                            <fa-icon
+                                *ngIf="!validIdeSelection()"
+                                [icon]="'question-circle'"
+                                class="text-danger"
+                                [placement]="'top'"
+                                ngbTooltip="{{ 'artemisApp.programmingExercise.allowOfflineIde.alert' | translate }}"
+                            ></fa-icon>
                         </label>
                     </div>
                 </div>
                 <div class="form-group-narrow">
                     <div class="form-check">
-                        <label class="form-check-label" for="field_allowOnlineEditor">
+                        <label [class]="!validIdeSelection() ? 'form-check-label text-danger' : 'form-check-label'" for="field_allowOnlineEditor">
                             <input
                                 class="form-check-input"
                                 type="checkbox"
@@ -351,7 +360,14 @@
                                 [(ngModel)]="programmingExercise.allowOnlineEditor"
                                 checked
                             />
-                            <span jhiTranslate="artemisApp.programmingExercise.allowOnlineEditor">Allow Online Editor</span>
+                            <span jhiTranslate="artemisApp.programmingExercise.allowOnlineEditor.title">Allow Online Editor</span>
+                            <fa-icon
+                                *ngIf="!validIdeSelection()"
+                                [icon]="'question-circle'"
+                                class="text-danger"
+                                [placement]="'top'"
+                                ngbTooltip="{{ 'artemisApp.programmingExercise.allowOnlineEditor.alert' | translate }}"
+                            ></fa-icon>
                         </label>
                     </div>
                 </div>
@@ -412,7 +428,14 @@
                 <div *ngIf="isImport" class="form-group-narrow">
                     <div class="form-check">
                         <label class="form-check-label" for="field_recreateBuildPlans">
-                            <input class="form-check-input" type="checkbox" name="recreateBuildPlans" id="field_recreateBuildPlans" [(ngModel)]="recreateBuildPlans" checked />
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                name="recreateBuildPlans"
+                                id="field_recreateBuildPlans"
+                                [(ngModel)]="recreateBuildPlans"
+                                (change)="onRecreateBuildPlanOrUpdateTemplateChange()"
+                            />
                             <span jhiTranslate="artemisApp.programmingExercise.recreateBuildPlans.title">Recreate Build Plans</span>
                             <jhi-help-icon placement="top" text="artemisApp.programmingExercise.recreateBuildPlans.description"></jhi-help-icon>
                         </label>
@@ -421,7 +444,14 @@
                 <div *ngIf="isImport" class="form-group-narrow">
                     <div class="form-check">
                         <label class="form-check-label" for="field_updateTemplateFiles">
-                            <input class="form-check-input" type="checkbox" name="recreateBuildPlans" id="field_updateTemplateFiles" [(ngModel)]="updateTemplate" checked />
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                name="updateTemplateFiles"
+                                id="field_updateTemplateFiles"
+                                [(ngModel)]="updateTemplate"
+                                (change)="onRecreateBuildPlanOrUpdateTemplateChange()"
+                            />
                             <span jhiTranslate="artemisApp.programmingExercise.updateTemplate.title">Update template</span>
                             <jhi-help-icon placement="top" text="artemisApp.programmingExercise.updateTemplate.description"></jhi-help-icon>
                         </label>
@@ -439,7 +469,7 @@
                 <jhi-button
                     id="save-entity"
                     [featureToggle]="FeatureToggle.PROGRAMMING_EXERCISES"
-                    [disabled]="editForm.form.invalid"
+                    [disabled]="editForm.form.invalid || !validIdeSelection()"
                     [isLoading]="isSaving"
                     [icon]="'save'"
                     [title]="submitButtonTitle"

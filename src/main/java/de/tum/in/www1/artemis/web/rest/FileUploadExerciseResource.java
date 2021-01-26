@@ -92,6 +92,12 @@ public class FileUploadExerciseResource {
             return ResponseEntity.badRequest().headers(HeaderUtil.createAlert(applicationName, "A new fileUploadExercise cannot already have an ID", "idexists")).body(null);
         }
 
+        // Validate score settings
+        Optional<ResponseEntity<FileUploadExercise>> optionalScoreSettingsError = exerciseService.validateScoreSettings(fileUploadExercise);
+        if (optionalScoreSettingsError.isPresent()) {
+            return optionalScoreSettingsError.get();
+        }
+
         // Validate the new file upload exercise
         validateNewOrUpdatedFileUploadExercise(fileUploadExercise);
 
@@ -107,7 +113,7 @@ public class FileUploadExerciseResource {
         FileUploadExercise result = fileUploadExerciseRepository.save(fileUploadExercise);
 
         // Only notify tutors when the exercise is created for a course
-        if (fileUploadExercise.hasCourse()) {
+        if (fileUploadExercise.isCourseExercise()) {
             groupNotificationService.notifyTutorGroupAboutExerciseCreated(fileUploadExercise);
         }
         return ResponseEntity.created(new URI("/api/file-upload-exercises/" + result.getId()))
@@ -165,6 +171,12 @@ public class FileUploadExerciseResource {
         // Validate the updated file upload exercise
         validateNewOrUpdatedFileUploadExercise(fileUploadExercise);
 
+        // Validate score settings
+        Optional<ResponseEntity<FileUploadExercise>> optionalScoreSettingsError = exerciseService.validateScoreSettings(fileUploadExercise);
+        if (optionalScoreSettingsError.isPresent()) {
+            return optionalScoreSettingsError.get();
+        }
+
         // Retrieve the course over the exerciseGroup or the given courseId
         Course course = courseService.retrieveCourseOverExerciseGroupOrCourseId(fileUploadExercise);
 
@@ -181,7 +193,7 @@ public class FileUploadExerciseResource {
         FileUploadExercise result = fileUploadExerciseRepository.save(fileUploadExercise);
 
         // Only notify students about changes if a regular exercise was updated
-        if (notificationText != null && fileUploadExercise.hasCourse()) {
+        if (notificationText != null && fileUploadExercise.isCourseExercise()) {
             groupNotificationService.notifyStudentGroupAboutExerciseUpdate(fileUploadExercise, notificationText);
         }
         return ResponseEntity.ok().headers(HeaderUtil.createEntityUpdateAlert(applicationName, true, ENTITY_NAME, exerciseId.toString())).body(result);
@@ -230,7 +242,7 @@ public class FileUploadExerciseResource {
         FileUploadExercise fileUploadExercise = optionalFileUploadExercise.get();
 
         // If the exercise belongs to an exam, only instructors and admins are allowed to access it, otherwise also TA have access
-        if (fileUploadExercise.hasExerciseGroup()) {
+        if (fileUploadExercise.isExamExercise()) {
             // Get the course over the exercise group
             ExerciseGroup exerciseGroup = exerciseGroupService.findOneWithExam(fileUploadExercise.getExerciseGroup().getId());
             Course course = exerciseGroup.getExam().getCourse();
@@ -269,7 +281,7 @@ public class FileUploadExerciseResource {
 
         // If the exercise belongs to an exam, the course must be retrieved over the exerciseGroup
         Course course;
-        if (fileUploadExercise.hasExerciseGroup()) {
+        if (fileUploadExercise.isExamExercise()) {
             course = exerciseGroupService.retrieveCourseOverExerciseGroup(fileUploadExercise.getExerciseGroup().getId());
         }
         else {

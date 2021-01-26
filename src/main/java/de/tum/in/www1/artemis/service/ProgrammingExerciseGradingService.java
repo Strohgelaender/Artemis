@@ -21,7 +21,8 @@ import de.tum.in.www1.artemis.domain.enumeration.CategoryState;
 import de.tum.in.www1.artemis.domain.enumeration.FeedbackType;
 import de.tum.in.www1.artemis.domain.enumeration.SubmissionType;
 import de.tum.in.www1.artemis.domain.participation.*;
-import de.tum.in.www1.artemis.exception.ContinousIntegrationException;
+import de.tum.in.www1.artemis.exception.ContinuousIntegrationException;
+import de.tum.in.www1.artemis.repository.ProgrammingSubmissionRepository;
 import de.tum.in.www1.artemis.repository.ResultRepository;
 import de.tum.in.www1.artemis.service.connectors.ContinuousIntegrationService;
 import de.tum.in.www1.artemis.web.rest.dto.ProgrammingExerciseGradingStatisticsDTO;
@@ -29,11 +30,6 @@ import de.tum.in.www1.artemis.web.rest.errors.EntityNotFoundException;
 
 @Service
 public class ProgrammingExerciseGradingService {
-
-    /**
-     * Placeholder point value for the score calculation of zero-point exercises to avoid the score always being 0.
-     */
-    public static final double PLACEHOLDER_POINTS_FOR_ZERO_POINT_EXERCISES = 100.0;
 
     private final Logger log = LoggerFactory.getLogger(ProgrammingExerciseGradingService.class);
 
@@ -55,12 +51,14 @@ public class ProgrammingExerciseGradingService {
 
     private final ResultService resultService;
 
+    private final ProgrammingSubmissionRepository programmingSubmissionRepository;
+
     private final AuditEventRepository auditEventRepository;
 
     public ProgrammingExerciseGradingService(ProgrammingExerciseTestCaseService testCaseService, ProgrammingSubmissionService programmingSubmissionService,
             ParticipationService participationService, ResultRepository resultRepository, Optional<ContinuousIntegrationService> continuousIntegrationService,
             SimpMessageSendingOperations messagingTemplate, StaticCodeAnalysisService staticCodeAnalysisService, ProgrammingAssessmentService programmingAssessmentService,
-            ResultService resultService, AuditEventRepository auditEventRepository) {
+            ResultService resultService, ProgrammingSubmissionRepository programmingSubmissionRepository, AuditEventRepository auditEventRepository) {
         this.testCaseService = testCaseService;
         this.programmingSubmissionService = programmingSubmissionService;
         this.participationService = participationService;
@@ -69,6 +67,7 @@ public class ProgrammingExerciseGradingService {
         this.messagingTemplate = messagingTemplate;
         this.staticCodeAnalysisService = staticCodeAnalysisService;
         this.programmingAssessmentService = programmingAssessmentService;
+        this.programmingSubmissionRepository = programmingSubmissionRepository;
         this.resultService = resultService;
         this.auditEventRepository = auditEventRepository;
     }
@@ -84,39 +83,85 @@ public class ProgrammingExerciseGradingService {
     public Optional<Result> processNewProgrammingExerciseResult(@NotNull ProgrammingExerciseParticipation participation, @NotNull Object requestBody) {
         log.debug("Received new build result (NEW) for participation " + participation.getId());
 
-        Result result;
+        Result newResult;
         try {
-            result = continuousIntegrationService.get().onBuildCompleted(participation, requestBody);
+            newResult = continuousIntegrationService.get().onBuildCompleted(participation, requestBody);
+            // NOTE: the result is not saved yet, but is connected to the submission, the submission is not completely saved yet
         }
-        catch (ContinousIntegrationException ex) {
+        catch (ContinuousIntegrationException ex) {
             log.error("Result for participation " + participation.getId() + " could not be created due to the following exception: " + ex);
             return Optional.empty();
         }
 
-        if (result != null) {
+        if (newResult != null) {
             ProgrammingExercise programmingExercise = participation.getProgrammingExercise();
             boolean isSolutionParticipation = participation instanceof SolutionProgrammingExerciseParticipation;
             boolean isTemplateParticipation = participation instanceof TemplateProgrammingExerciseParticipation;
             // Find out which test cases were executed and calculate the score according to their status and weight.
             // This needs to be done as some test cases might not have been executed.
-            // When the result is from a solution participation , extract the feedback items (= test cases) and store them in our database.
+            // When the result is from a solution participation, extract the feedback items (= test cases) and store them in our database.
             if (isSolutionParticipation) {
-                extractTestCasesFromResult(programmingExercise, result);
+                extractTestCasesFromResult(programmingExercise, newResult);
             }
-            result = updateResult(result, programmingExercise, !isSolutionParticipation && !isTemplateParticipation);
+            newResult = calculateScoreForResult(newResult, programmingExercise, !isSolutionParticipation && !isTemplateParticipation);
 
-            // workaround to prevent that result.submission suddenly turns into a proxy and cannot be used any more later after returning this method
-            Submission tmpSubmission = result.getSubmission();
-            result = resultRepository.save(result);
-            result.setSubmission(tmpSubmission);
+            // Note: This programming submission might already have multiple results, however they do not contain the assessor or the feedback
+            var programmingSubmission = (ProgrammingSubmission) newResult.getSubmission();
 
             // If the solution participation was updated, also trigger the template participation build.
             if (isSolutionParticipation) {
                 // This method will return without triggering the build if the submission is not of type TEST.
-                triggerTemplateBuildIfTestCasesChanged(programmingExercise.getId(), result.getId());
+                triggerTemplateBuildIfTestCasesChanged(programmingExercise.getId(), programmingSubmission);
             }
+
+            if (!isSolutionParticipation && !isTemplateParticipation && programmingSubmission.getLatestResult() != null && programmingSubmission.getLatestResult().isManual()) {
+                // Note: in this case, we do not want to save the newResult, but we only want to update the latest semi-automatic one
+                Result updatedLatestSemiAutomaticResult = updateLatestSemiAutomaticResultWithNewAutomaticFeedback(programmingSubmission.getLatestResult().getId(), newResult,
+                        programmingExercise);
+                programmingSubmissionRepository.save(programmingSubmission);
+                return Optional.of(updatedLatestSemiAutomaticResult);
+            }
+
+            // Finally save the new result once and make sure the order column between submission and result is maintained
+            newResult.setSubmission(null); // workaround to avoid org.hibernate.HibernateException: null index column for collection:
+                                           // de.tum.in.www1.artemis.domain.Submission.results
+            newResult = resultRepository.save(newResult);
+            newResult.setSubmission(programmingSubmission);
+            programmingSubmission.addResult(newResult);
+            programmingSubmissionRepository.save(programmingSubmission);
         }
-        return Optional.ofNullable(result);
+        return Optional.ofNullable(newResult);
+    }
+
+    /**
+     * Updates an existing semi-automatic result with automatic feedback from another result.
+     *
+     * Note: for the second correction it is important that we do not create additional semi automatic results
+     *
+     * @param lastSemiAutomaticResultId The latest manual result for the same submission (which must exist in the database)
+     * @param newAutomaticResult The new automatic result
+     * @param programmingExercise The programming exercise
+     * @return The updated semi-automatic result
+     */
+    private Result updateLatestSemiAutomaticResultWithNewAutomaticFeedback(long lastSemiAutomaticResultId, Result newAutomaticResult, ProgrammingExercise programmingExercise) {
+        // Note: refetch the semi automatic result with feedback and assessor
+        var latestSemiAutomaticResult = resultRepository.findByIdWithEagerFeedbacksAndAssessor(lastSemiAutomaticResultId).get();
+        // this makes it the most recent result, but optionally keeps the draft state of an unfinished manual result
+        latestSemiAutomaticResult.setCompletionDate(latestSemiAutomaticResult.getCompletionDate() != null ? newAutomaticResult.getCompletionDate() : null);
+
+        // remove old automatic feedback
+        latestSemiAutomaticResult.getFeedbacks().removeIf(feedback -> feedback != null && feedback.getType() == FeedbackType.AUTOMATIC);
+
+        // copy all feedback from the automatic result
+        for (Feedback feedback : newAutomaticResult.getFeedbacks()) {
+            Feedback newFeedback = feedback.copyFeedback();
+            latestSemiAutomaticResult.addFeedback(newFeedback);
+        }
+
+        String resultString = updateManualResultString(newAutomaticResult.getResultString(), latestSemiAutomaticResult, programmingExercise);
+        latestSemiAutomaticResult.setResultString(resultString);
+
+        return resultRepository.save(latestSemiAutomaticResult);
     }
 
     /**
@@ -126,19 +171,9 @@ public class ProgrammingExerciseGradingService {
      * If the submission of the provided result is not of type TEST, the method will return without triggering the build.
      *
      * @param programmingExerciseId ProgrammingExercise id that belongs to the result.
-     * @param resultId              Result id.
+     * @param submission            ProgrammingSubmission
      */
-    private void triggerTemplateBuildIfTestCasesChanged(long programmingExerciseId, long resultId) {
-        ProgrammingSubmission submission;
-        try {
-            submission = programmingSubmissionService.findByResultId(resultId);
-        }
-        catch (EntityNotFoundException ex) {
-            // This is an unlikely error that would mean that no submission could be created for the result. In this case we can only log and abort.
-            log.error("Could not trigger the build of the template repository for the programming exercise id " + programmingExerciseId
-                    + " because no submission could be found for the provided result id " + resultId);
-            return;
-        }
+    private void triggerTemplateBuildIfTestCasesChanged(long programmingExerciseId, ProgrammingSubmission submission) {
         // We only trigger the template build when the test repository was changed.
         if (!submission.getType().equals(SubmissionType.TEST)) {
             return;
@@ -184,14 +219,14 @@ public class ProgrammingExerciseGradingService {
      * @param isStudentParticipation boolean flag indicating weather the participation of the result is not a solution/template participation.
      * @return Result with updated feedbacks, score and result string.
      */
-    public Result updateResult(Result result, ProgrammingExercise exercise, boolean isStudentParticipation) {
+    public Result calculateScoreForResult(Result result, ProgrammingExercise exercise, boolean isStudentParticipation) {
         Set<ProgrammingExerciseTestCase> testCases = testCaseService.findActiveByExerciseId(exercise.getId());
         Set<ProgrammingExerciseTestCase> testCasesForCurrentDate = testCases;
         // We don't filter the test cases for the solution/template participation's results as they are used as indicators for the instructor!
         if (isStudentParticipation) {
             testCasesForCurrentDate = filterTestCasesForCurrentDate(exercise, testCases);
         }
-        return updateResult(testCases, testCasesForCurrentDate, result, exercise);
+        return calculateScoreForResult(testCases, testCasesForCurrentDate, result, exercise);
     }
 
     /**
@@ -214,11 +249,11 @@ public class ProgrammingExerciseGradingService {
         Result solutionResult = exercise.getSolutionParticipation().findLatestResult();
         // template and solution are always updated using ALL test cases
         if (templateResult != null) {
-            updateResult(testCases, testCases, templateResult, exercise);
+            calculateScoreForResult(testCases, testCases, templateResult, exercise);
             updatedResults.add(templateResult);
         }
         if (solutionResult != null) {
-            updateResult(testCases, testCases, solutionResult, exercise);
+            calculateScoreForResult(testCases, testCases, solutionResult, exercise);
             updatedResults.add(solutionResult);
         }
         // filter the test cases for the student results if necessary
@@ -229,7 +264,7 @@ public class ProgrammingExerciseGradingService {
         for (StudentParticipation studentParticipation : participations) {
             Result result = studentParticipation.findLatestResult();
             if (result != null) {
-                updateResult(testCases, testCasesForCurrentDate, result, exercise);
+                calculateScoreForResult(testCases, testCasesForCurrentDate, result, exercise);
                 updatedResults.add(result);
             }
         }
@@ -239,7 +274,7 @@ public class ProgrammingExerciseGradingService {
         for (StudentParticipation studentParticipation : participationsWithManualResult) {
             Result result = studentParticipation.findLatestResult();
             if (result != null) {
-                updateResult(testCases, testCasesForCurrentDate, result, exercise);
+                calculateScoreForResult(testCases, testCasesForCurrentDate, result, exercise);
                 updatedResults.add(result);
             }
         }
@@ -275,7 +310,7 @@ public class ProgrammingExerciseGradingService {
      * @param exercise The current exercise
      * @return The updated result
      */
-    private Result updateResult(Set<ProgrammingExerciseTestCase> testCases, Set<ProgrammingExerciseTestCase> testCasesForCurrentDate, @NotNull Result result,
+    private Result calculateScoreForResult(Set<ProgrammingExerciseTestCase> testCases, Set<ProgrammingExerciseTestCase> testCasesForCurrentDate, @NotNull Result result,
             ProgrammingExercise exercise) {
 
         // Distinguish between static code analysis feedback, test case feedback and manual feedback
@@ -365,13 +400,12 @@ public class ProgrammingExerciseGradingService {
             List<Feedback> staticCodeAnalysisFeedback, ProgrammingExercise programmingExercise) {
         if (successfulTestCases.size() > 0) {
 
-            double maxScoreRespectingZeroPointExercises = getMaxScoreRespectingZeroPointExercises(programmingExercise);
             double weightSum = allTests.stream().mapToDouble(ProgrammingExerciseTestCase::getWeight).sum();
 
             // calculate the achieved points from the passed test cases
             double successfulTestPoints = successfulTestCases.stream().mapToDouble(test -> {
                 double testWeight = test.getWeight() * test.getBonusMultiplier();
-                double testPoints = testWeight / weightSum * maxScoreRespectingZeroPointExercises;
+                double testPoints = testWeight / weightSum * programmingExercise.getMaxScore();
                 double testPointsWithBonus = testPoints + test.getBonusPoints();
                 // update credits of related feedback
                 result.getFeedbacks().stream().filter(fb -> fb.getType() == FeedbackType.AUTOMATIC && fb.getText().equals(test.getTestName())).findFirst()
@@ -386,7 +420,8 @@ public class ProgrammingExerciseGradingService {
              * receive the full 20 points, if the points are not capped before the penalty is subtracted. With the implemented order in place
              * successfulTestPoints will be capped to 20 points first, then the penalty is subtracted resulting in 10 points.
              */
-            double maxPoints = maxScoreRespectingZeroPointExercises + Optional.ofNullable(programmingExercise.getBonusPoints()).orElse(0.0);
+            double maxPoints = programmingExercise.getMaxScore() + Optional.ofNullable(programmingExercise.getBonusPoints()).orElse(0.0);
+
             if (successfulTestPoints > maxPoints) {
                 successfulTestPoints = maxPoints;
             }
@@ -402,7 +437,7 @@ public class ProgrammingExerciseGradingService {
             }
 
             // The score is calculated as a percentage of the maximum points
-            long score = Math.round(successfulTestPoints / maxScoreRespectingZeroPointExercises * 100.0);
+            long score = Math.round(successfulTestPoints / programmingExercise.getMaxScore() * 100.0);
 
             result.setScore(score);
         }
@@ -455,7 +490,7 @@ public class ProgrammingExerciseGradingService {
          * points due to static code analysis issues.
          */
         final var maxExercisePenaltyPoints = (double) Optional.ofNullable(programmingExercise.getMaxStaticCodeAnalysisPenalty()).orElse(100) / 100.0
-                * getMaxScoreRespectingZeroPointExercises(programmingExercise);
+                * programmingExercise.getMaxScore();
         if (codeAnalysisPenaltyPoints > maxExercisePenaltyPoints) {
             codeAnalysisPenaltyPoints = maxExercisePenaltyPoints;
         }
@@ -481,30 +516,25 @@ public class ProgrammingExerciseGradingService {
             String issueTerm = scaFeedback.size() == 1 ? ", 1 issue" : ", " + scaFeedback.size() + " issues";
             newResultString += issueTerm;
         }
-        if (result.isManualResult()) {
-            // Calculate different scores for totalScore calculation and add points and maxScore to result string
-            double maxScore = getMaxScoreRespectingZeroPointExercises(exercise);
-            double points = programmingAssessmentService.calculateTotalScore(result);
-            result.setScore(points, maxScore);
-            newResultString += ", " + result.createResultString(points, maxScore);
+        if (result.isManual()) {
+            newResultString = updateManualResultString(newResultString, result, exercise);
         }
         result.setResultString(newResultString);
     }
 
     /**
-     * Returns the maximum amount of regular points for the given exercise or a replacement point amount if the exercise has zero points (neither regular nor bonus points).
-     * <p>
-     * <b>Must only be used for the exercise-local score calculation and display messages and never for the actual score of a student in a course.</b>
-     * @param programmingExercise the exercise to the the maxScore for
-     * @return {@link Exercise#getMaxScore()} or {@link #PLACEHOLDER_POINTS_FOR_ZERO_POINT_EXERCISES}
+     * Update the result string of a manual result with the achieved points.
+     * @param resultString The automatic part of the result string
+     * @param result The result to add the result string
+     * @param exercise The programming exercise
+     * @return The updated result string
      */
-    private static double getMaxScoreRespectingZeroPointExercises(ProgrammingExercise programmingExercise) {
-        boolean hasNormalPoints = Objects.requireNonNullElse(programmingExercise.getMaxScore(), 0.0) > 0.0;
-        boolean hasBonusPoints = Objects.requireNonNullElse(programmingExercise.getMaxScore(), 0.0) > 0.0;
-        if (hasNormalPoints || hasBonusPoints) {
-            return programmingExercise.getMaxScore();
-        }
-        return PLACEHOLDER_POINTS_FOR_ZERO_POINT_EXERCISES;
+    private String updateManualResultString(String resultString, Result result, ProgrammingExercise exercise) {
+        // Calculate different scores for totalScore calculation and add points and maxScore to result string
+        double maxScore = exercise.getMaxScore();
+        double points = programmingAssessmentService.calculateTotalScore(result);
+        result.setScore(points, maxScore);
+        return resultString + ", " + result.createResultString(points, maxScore);
     }
 
     /**

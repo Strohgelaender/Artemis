@@ -26,7 +26,6 @@ import { ArtemisModelingExerciseManagementModule } from 'app/exercises/modeling/
 import { ArtemisCourseScoresModule } from 'app/course/course-scores/course-scores.module';
 import { ArtemisExerciseScoresModule } from 'app/exercises/shared/exercise-scores/exercise-scores.module';
 import { ArtemisComplaintsForTutorModule } from 'app/complaints/complaints-for-tutor/complaints-for-tutor.module';
-import { ArtemisTextExerciseAssessmentModule } from 'app/exercises/text/assess/text-assessment.module';
 import { ArtemisFileUploadAssessmentModule } from 'app/exercises/file-upload/assess/file-upload-assessment.module';
 import { ArtemisModelingAssessmentEditorModule } from 'app/exercises/modeling/assess/modeling-assessment-editor/modeling-assessment-editor.module';
 import { CourseGroupComponent } from 'app/course/manage/course-group.component';
@@ -39,6 +38,7 @@ import { ArtemisListOfComplaintsModule } from 'app/complaints/list-of-complaints
 import { ArtemisAssessmentSharedModule } from 'app/assessment/assessment-shared.module';
 import { ArtemisCourseQuestionsModule } from 'app/course/course-questions/course-questions.module';
 import { ArtemisSharedPipesModule } from 'app/shared/pipes/shared-pipes.module';
+import { ArtemisLearningGoalsModule } from 'app/course/learning-goals/learning-goal.module';
 
 @NgModule({
     imports: [
@@ -52,6 +52,7 @@ import { ArtemisSharedPipesModule } from 'app/shared/pipes/shared-pipes.module';
         ArtemisExerciseModule,
         ArtemisLectureModule,
         ArtemisCourseScoresModule,
+        ArtemisLearningGoalsModule,
         ArtemisExerciseScoresModule,
         ArtemisProgrammingExerciseManagementModule,
         ArtemisFileUploadExerciseManagementModule,
@@ -67,7 +68,6 @@ import { ArtemisSharedPipesModule } from 'app/shared/pipes/shared-pipes.module';
         ArtemisParticipationModule,
         ArtemisComplaintsForTutorModule,
         ArtemisListOfComplaintsModule,
-        ArtemisTextExerciseAssessmentModule,
         ArtemisFileUploadAssessmentModule,
         ArtemisModelingAssessmentEditorModule,
         NgxDatatableModule,

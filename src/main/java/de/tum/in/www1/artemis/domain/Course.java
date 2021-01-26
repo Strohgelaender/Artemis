@@ -3,9 +3,7 @@ package de.tum.in.www1.artemis.domain;
 import static de.tum.in.www1.artemis.config.Constants.ARTEMIS_GROUP_DEFAULT_PREFIX;
 
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import javax.persistence.*;
@@ -136,7 +134,8 @@ public class Course extends DomainObject {
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnoreProperties("course")
-    private List<LearningGoal> learningGoals = new ArrayList<>();
+    @OrderBy("title")
+    private Set<LearningGoal> learningGoals = new HashSet<>();
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.REMOVE, orphanRemoval = true, fetch = FetchType.LAZY)
     @Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
@@ -435,7 +434,7 @@ public class Course extends DomainObject {
     @PrePersist
     public void beforeCreate() {
         // move file if necessary (id at this point will be null, so placeholder will be inserted)
-        courseIcon = fileService.manageFilesForUpdatedFilePath(prevCourseIcon, courseIcon, FilePathService.getCourseIconFilepath(), getId());
+        courseIcon = fileService.manageFilesForUpdatedFilePath(prevCourseIcon, courseIcon, FilePathService.getCourseIconFilePath(), getId());
     }
 
     @PostPersist
@@ -449,13 +448,13 @@ public class Course extends DomainObject {
     @PreUpdate
     public void onUpdate() {
         // move file and delete old file if necessary
-        courseIcon = fileService.manageFilesForUpdatedFilePath(prevCourseIcon, courseIcon, FilePathService.getCourseIconFilepath(), getId());
+        courseIcon = fileService.manageFilesForUpdatedFilePath(prevCourseIcon, courseIcon, FilePathService.getCourseIconFilePath(), getId());
     }
 
     @PostRemove
     public void onDelete() {
         // delete old file if necessary
-        fileService.manageFilesForUpdatedFilePath(prevCourseIcon, null, FilePathService.getCourseIconFilepath(), getId());
+        fileService.manageFilesForUpdatedFilePath(prevCourseIcon, null, FilePathService.getCourseIconFilePath(), getId());
     }
 
     @Override
@@ -491,11 +490,11 @@ public class Course extends DomainObject {
         return this.numberOfStudentsTransient;
     }
 
-    public List<LearningGoal> getLearningGoals() {
+    public Set<LearningGoal> getLearningGoals() {
         return learningGoals;
     }
 
-    public void setLearningGoals(List<LearningGoal> learningGoals) {
+    public void setLearningGoals(Set<LearningGoal> learningGoals) {
         this.learningGoals = learningGoals;
     }
 

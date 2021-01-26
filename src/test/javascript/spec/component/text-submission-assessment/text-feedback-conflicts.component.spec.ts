@@ -9,18 +9,18 @@ import { of } from 'rxjs';
 import { HttpResponse } from '@angular/common/http';
 import { MockComponent } from 'ng-mocks';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
-import { TextFeedbackConflictsComponent } from 'app/exercises/text/assess-new/conflicts/text-feedback-conflicts.component';
+import { TextFeedbackConflictsComponent } from 'app/exercises/text/assess/conflicts/text-feedback-conflicts.component';
 import { TextAssessmentsService } from 'app/exercises/text/assess/text-assessments.service';
 import { ArtemisSharedModule } from 'app/shared/shared.module';
 import { AssessmentInstructionsModule } from 'app/assessment/assessment-instructions/assessment-instructions.module';
 import { ArtemisConfirmIconModule } from 'app/shared/confirm-icon/confirm-icon.module';
 import { TextSharedModule } from 'app/exercises/text/shared/text-shared.module';
-import { TextSubmissionAssessmentComponent } from 'app/exercises/text/assess-new/text-submission-assessment.component';
-import { TextAssessmentAreaComponent } from 'app/exercises/text/assess-new/text-assessment-area/text-assessment-area.component';
-import { TextblockAssessmentCardComponent } from 'app/exercises/text/assess-new/textblock-assessment-card/textblock-assessment-card.component';
-import { TextblockFeedbackEditorComponent } from 'app/exercises/text/assess-new/textblock-feedback-editor/textblock-feedback-editor.component';
-import { ManualTextblockSelectionComponent } from 'app/exercises/text/assess-new/manual-textblock-selection/manual-textblock-selection.component';
-import { TextFeedbackConflictsHeaderComponent } from 'app/exercises/text/assess-new/conflicts/conflicts-header/text-feedback-conflicts-header.component';
+import { TextSubmissionAssessmentComponent } from 'app/exercises/text/assess/text-submission-assessment.component';
+import { TextAssessmentAreaComponent } from 'app/exercises/text/assess/text-assessment-area/text-assessment-area.component';
+import { TextblockAssessmentCardComponent } from 'app/exercises/text/assess/textblock-assessment-card/textblock-assessment-card.component';
+import { TextblockFeedbackEditorComponent } from 'app/exercises/text/assess/textblock-feedback-editor/textblock-feedback-editor.component';
+import { ManualTextblockSelectionComponent } from 'app/exercises/text/assess/manual-textblock-selection/manual-textblock-selection.component';
+import { TextFeedbackConflictsHeaderComponent } from 'app/exercises/text/assess/conflicts/conflicts-header/text-feedback-conflicts-header.component';
 import { getLatestSubmissionResult, SubmissionExerciseType, SubmissionType } from 'app/entities/submission.model';
 import { TextSubmission } from 'app/entities/text-submission.model';
 import { Result } from 'app/entities/result.model';
@@ -73,8 +73,9 @@ describe('TextFeedbackConflictsComponent', () => {
             textSubmission,
         } as unknown) as Result,
     ];
+    textSubmission.latestResult = getLatestSubmissionResult(textSubmission);
 
-    getLatestSubmissionResult(textSubmission)!.feedbacks = [
+    textSubmission.latestResult!.feedbacks = [
         {
             id: 1,
             detailText: 'First Feedback',
@@ -98,7 +99,7 @@ describe('TextFeedbackConflictsComponent', () => {
             textSubmission,
         } as unknown) as TextBlock,
     ];
-    getLatestSubmissionResult(textSubmission)!.feedbacks![0].conflictingTextAssessments = [
+    textSubmission.latestResult!.feedbacks![0].conflictingTextAssessments = [
         {
             id: 1,
             conflict: true,
@@ -129,7 +130,8 @@ describe('TextFeedbackConflictsComponent', () => {
             conflictingSubmission,
         } as unknown) as Result,
     ];
-    getLatestSubmissionResult(conflictingSubmission)!.feedbacks = [
+    conflictingSubmission.latestResult = getLatestSubmissionResult(conflictingSubmission);
+    conflictingSubmission.latestResult!.feedbacks = [
         {
             id: 5,
             detailText: 'Conflicting feedback',
@@ -208,8 +210,8 @@ describe('TextFeedbackConflictsComponent', () => {
         fixture.detectChanges();
         expect(component.rightSubmission).toBe(conflictingSubmission);
         expect(component.rightTotalScore).toBe(1.5);
-        expect(component.feedbackConflicts).toBe(getLatestSubmissionResult(textSubmission)!.feedbacks![0].conflictingTextAssessments!);
-        expect(component.rightTextBlockRefs[0].feedback).toBe(getLatestSubmissionResult(conflictingSubmission)!.feedbacks![0]);
+        expect(component.feedbackConflicts).toBe(textSubmission.latestResult!.feedbacks![0].conflictingTextAssessments!);
+        expect(component.rightTextBlockRefs[0].feedback).toBe(conflictingSubmission.latestResult!.feedbacks![0]);
     });
 
     it('should use jhi-text-assessment-area', () => {
@@ -239,14 +241,14 @@ describe('TextFeedbackConflictsComponent', () => {
         spyOn(textAssessmentsService, 'submit').and.returnValue(
             of(
                 new HttpResponse({
-                    body: getLatestSubmissionResult(component.leftSubmission!),
+                    body: component.leftSubmission!.latestResult,
                 }),
             ),
         );
         component.overrideLeftSubmission();
         expect(textAssessmentsService.submit).toHaveBeenCalledWith(
             exercise.id!,
-            getLatestSubmissionResult(textSubmission)!.id!,
+            textSubmission.latestResult!.id!,
             [component.leftTextBlockRefs[0].feedback!],
             [component.leftTextBlockRefs[0].block!],
         );
@@ -265,7 +267,7 @@ describe('TextFeedbackConflictsComponent', () => {
         });
 
         expect(component.selectedRightFeedbackId).toBeTruthy();
-        expect(component.selectedRightFeedbackId).toBe(getLatestSubmissionResult(conflictingSubmission)!.feedbacks![0].id);
+        expect(component.selectedRightFeedbackId).toBe(conflictingSubmission.latestResult!.feedbacks![0].id);
     });
 
     it('should be able to un-select conflicting feedback', () => {
@@ -309,9 +311,9 @@ describe('TextFeedbackConflictsComponent', () => {
         component['setPropertiesFromServerResponse']([conflictingSubmission]);
         fixture.detectChanges();
 
-        component.didSelectConflictingFeedback(getLatestSubmissionResult(conflictingSubmission)!.feedbacks![0].id!);
+        component.didSelectConflictingFeedback(conflictingSubmission.latestResult!.feedbacks![0].id!);
 
-        const feedbackConflict = getLatestSubmissionResult(textSubmission)!.feedbacks![0].conflictingTextAssessments![0];
+        const feedbackConflict = textSubmission.latestResult!.feedbacks![0].conflictingTextAssessments![0];
         feedbackConflict.conflict = false;
         feedbackConflict.discard = true;
         spyOn(textAssessmentsService, 'solveFeedbackConflict').and.returnValue(
@@ -328,8 +330,8 @@ describe('TextFeedbackConflictsComponent', () => {
     it('should switch submissions when it changed in the header', () => {
         const secondConflictingSubmission = Object.assign({}, conflictingSubmission);
         secondConflictingSubmission.id! += 1;
-        getLatestSubmissionResult(secondConflictingSubmission)!.feedbacks![0].id! += 1;
-        getLatestSubmissionResult(secondConflictingSubmission)!.id! += 1;
+        secondConflictingSubmission.latestResult!.feedbacks![0].id! += 1;
+        secondConflictingSubmission.latestResult!.id! += 1;
 
         component['setPropertiesFromServerResponse']([conflictingSubmission, secondConflictingSubmission]);
         fixture.detectChanges();

@@ -4,13 +4,17 @@ import static de.tum.in.www1.artemis.config.Constants.ASSIGNMENT_REPO_NAME;
 import static de.tum.in.www1.artemis.config.Constants.TEST_REPO_NAME;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.http.HttpException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,9 @@ import de.tum.in.www1.artemis.service.connectors.VersionControlService;
 public class ProgrammingExerciseImportService {
 
     private final Logger log = LoggerFactory.getLogger(ProgrammingExerciseImportService.class);
+
+    @Value("${artemis.repo-download-clone-path}")
+    private String repoDownloadClonePath;
 
     private final ExerciseHintService exerciseHintService;
 
@@ -55,11 +62,13 @@ public class ProgrammingExerciseImportService {
 
     private final UserService userService;
 
+    private final StaticCodeAnalysisService staticCodeAnalysisService;
+
     public ProgrammingExerciseImportService(ExerciseHintService exerciseHintService, Optional<VersionControlService> versionControlService,
             Optional<ContinuousIntegrationService> continuousIntegrationService, ProgrammingExerciseParticipationService programmingExerciseParticipationService,
             ProgrammingExerciseTestCaseRepository programmingExerciseTestCaseRepository, StaticCodeAnalysisCategoryRepository staticCodeAnalysisCategoryRepository,
             ProgrammingExerciseRepository programmingExerciseRepository, ProgrammingExerciseService programmingExerciseService, GitService gitService, FileService fileService,
-            UserService userService) {
+            UserService userService, StaticCodeAnalysisService staticCodeAnalysisService) {
         this.exerciseHintService = exerciseHintService;
         this.versionControlService = versionControlService;
         this.continuousIntegrationService = continuousIntegrationService;
@@ -71,6 +80,7 @@ public class ProgrammingExerciseImportService {
         this.gitService = gitService;
         this.fileService = fileService;
         this.userService = userService;
+        this.staticCodeAnalysisService = staticCodeAnalysisService;
     }
 
     /**
@@ -91,7 +101,7 @@ public class ProgrammingExerciseImportService {
      * @param newExercise The new exercise already containing values which should not get copied, i.e. overwritten
      * @return The newly created exercise
      */
-    @Transactional
+    @Transactional // ok because we create many objects in a rather complex way and need a rollback in case of exceptions
     public ProgrammingExercise importProgrammingExerciseBasis(final ProgrammingExercise templateExercise, final ProgrammingExercise newExercise) {
         // Set values we don't want to copy to null
         setupExerciseForImport(newExercise);
@@ -105,11 +115,17 @@ public class ProgrammingExerciseImportService {
         exerciseHintService.copyExerciseHints(templateExercise, newExercise);
         programmingExerciseRepository.save(newExercise);
         importTestCases(templateExercise, newExercise);
-        if (Boolean.TRUE.equals(templateExercise.isStaticCodeAnalysisEnabled())) {
+
+        // Copy or create SCA categories
+        if (Boolean.TRUE.equals(newExercise.isStaticCodeAnalysisEnabled() && Boolean.TRUE.equals(templateExercise.isStaticCodeAnalysisEnabled()))) {
             importStaticCodeAnalysisCategories(templateExercise, newExercise);
         }
+        else if (Boolean.TRUE.equals(newExercise.isStaticCodeAnalysisEnabled()) && !Boolean.TRUE.equals(templateExercise.isStaticCodeAnalysisEnabled())) {
+            staticCodeAnalysisService.createDefaultCategories(newExercise);
+        }
+
         // An exam exercise can only be in individual mode
-        if (!newExercise.hasCourse()) {
+        if (!newExercise.isCourseExercise()) {
             newExercise.setMode(ExerciseMode.INDIVIDUAL);
             newExercise.setTeamAssignmentConfig(null);
         }
@@ -133,10 +149,11 @@ public class ProgrammingExerciseImportService {
         // Copy all repositories
         final var reposToCopy = List.of(Pair.of(RepositoryType.TEMPLATE, templateExercise.getTemplateRepositoryName()),
                 Pair.of(RepositoryType.SOLUTION, templateExercise.getSolutionRepositoryName()), Pair.of(RepositoryType.TESTS, templateExercise.getTestRepositoryName()));
+
         reposToCopy.forEach(repo -> versionControlService.get().copyRepository(sourceProjectKey, repo.getSecond(), targetProjectKey, repo.getFirst().getName()));
 
         // Unprotect the master branch of the template exercise repo.
-        versionControlService.get().unprotectBranch(newExercise.getTemplateRepositoryUrlAsUrl(), "master");
+        versionControlService.get().unprotectBranch(newExercise.getVcsTemplateRepositoryUrl(), "master");
 
         // Add the necessary hooks notifying Artemis about changes after commits have been pushed
         versionControlService.get().addWebHooksForExercise(newExercise);
@@ -278,7 +295,7 @@ public class ProgrammingExerciseImportService {
         newExercise.setAttachments(null);
         newExercise.setNumberOfMoreFeedbackRequests(null);
         newExercise.setNumberOfComplaints(null);
-        newExercise.setNumberOfAssessments(null);
+        newExercise.setTotalNumberOfAssessments(null);
         newExercise.setTutorParticipations(null);
         newExercise.setExampleSubmissions(null);
         newExercise.setStudentQuestions(null);
@@ -340,7 +357,7 @@ public class ProgrammingExerciseImportService {
      */
     private void adjustProjectName(Map<String, String> replacements, String projectKey, String repositoryName, User user)
             throws GitAPIException, IOException, InterruptedException {
-        final var repositoryUrl = versionControlService.get().getCloneRepositoryUrl(projectKey, repositoryName).getURL();
+        final var repositoryUrl = versionControlService.get().getCloneRepositoryUrl(projectKey, repositoryName);
         Repository repository = gitService.getOrCheckoutRepository(repositoryUrl, true);
         fileService.replaceVariablesInFileRecursive(repository.getLocalPath().toAbsolutePath().toString(), replacements);
         gitService.stageAllChanges(repository);

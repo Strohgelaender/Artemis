@@ -69,16 +69,14 @@ public class ProgrammingExerciseSimulationService {
      * @return returns the modified and stored programming exercise
      * This functionality is only for testing purposes (noVersionControlAndContinuousIntegrationAvailable)
      */
-    @Transactional
+    @Transactional // ok because we create many objects in a rather complex way and need a rollback in case of exceptions
     public ProgrammingExercise createProgrammingExerciseWithoutVersionControlAndContinuousIntegrationAvailable(ProgrammingExercise programmingExercise) {
         programmingExercise.generateAndSetProjectKey();
 
         programmingExerciseService.initParticipations(programmingExercise);
         setURLsAndBuildPlanIDsForNewExerciseWithoutVersionControlAndContinuousIntegrationAvailable(programmingExercise);
-        // Save participations to get the ids required for the webhooks
-        programmingExerciseService.connectBaseParticipationsToExerciseAndSave(programmingExercise);
 
-        // save to get the id required for the webhook
+        programmingExerciseService.connectBaseParticipationsToExerciseAndSave(programmingExercise);
         programmingExercise = programmingExerciseRepository.save(programmingExercise);
 
         // The creation of the webhooks must occur after the initial push, because the participation is
@@ -128,7 +126,7 @@ public class ProgrammingExerciseSimulationService {
         ProgrammingSubmission templateProgrammingSubmission = new ProgrammingSubmission();
         templateProgrammingSubmission.setParticipation(templateProgrammingExerciseParticipation.get());
         templateProgrammingSubmission.setSubmitted(true);
-        templateProgrammingSubmission.setType(SubmissionType.OTHER);
+        templateProgrammingSubmission.setType(SubmissionType.MANUAL);
         templateProgrammingSubmission.setCommitHash(commitHashBase);
         templateProgrammingSubmission.setSubmissionDate(templateProgrammingExerciseParticipation.get().getInitializationDate());
         programmingSubmissionRepository.save(templateProgrammingSubmission);
@@ -146,7 +144,7 @@ public class ProgrammingExerciseSimulationService {
         String commitHashSolution = VCSSimulationUtils.simulateCommitHash();
         solutionProgrammingSubmission.setParticipation(solutionProgrammingExerciseParticipation.get());
         solutionProgrammingSubmission.setSubmitted(true);
-        solutionProgrammingSubmission.setType(SubmissionType.OTHER);
+        solutionProgrammingSubmission.setType(SubmissionType.MANUAL);
         solutionProgrammingSubmission.setCommitHash(commitHashSolution);
         solutionProgrammingSubmission.setSubmissionDate(solutionProgrammingExerciseParticipation.get().getInitializationDate());
         programmingSubmissionRepository.save(solutionProgrammingSubmission);

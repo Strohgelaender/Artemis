@@ -94,6 +94,7 @@ export class StudentExamsComponent implements OnInit {
         if (this.longestWorkingTime && this.exam) {
             const examEndDate = moment(this.exam.startDate);
             examEndDate.add(this.longestWorkingTime, 'seconds');
+            examEndDate.add(this.exam.gracePeriod, 'seconds');
             this.isExamOver = examEndDate.isBefore(moment());
         }
     }
@@ -214,6 +215,28 @@ export class StudentExamsComponent implements OnInit {
         );
     }
 
+    assessUnsubmittedExamModelingAndTextParticipations() {
+        this.isLoading = true;
+        this.examManagementService.assessUnsubmittedExamModelingAndTextParticipations(this.courseId, this.examId).subscribe(
+            (res) => {
+                this.jhiAlertService.addAlert(
+                    {
+                        type: 'success',
+                        msg: 'artemisApp.studentExams.assessUnsubmittedStudentExamsSuccess',
+                        params: { number: res?.body },
+                        timeout: 10000,
+                    },
+                    [],
+                );
+                this.isLoading = false;
+            },
+            () => {
+                this.isLoading = false;
+                this.jhiAlertService.error('artemisApp.studentExams.assessUnsubmittedStudentExamsFailure');
+            },
+        );
+    }
+
     /**
      * Unlock all repositories immediately. Asks for confirmation.
      */
@@ -252,7 +275,7 @@ export class StudentExamsComponent implements OnInit {
     }
 
     /**
-     * Unlock all repositories immediately. Asks for confirmation.
+     * Lock all repositories immediately. Asks for confirmation.
      */
     handleLockAllRepositories() {
         const modalRef = this.modalService.open(ConfirmAutofocusModalComponent, { keyboard: true, size: 'lg' });
@@ -264,7 +287,7 @@ export class StudentExamsComponent implements OnInit {
     }
 
     /**
-     * Unlocks all programming exercises that belong to the exam
+     * Locks all programming exercises that belong to the exam
      */
     private lockAllRepositories() {
         this.isLoading = true;

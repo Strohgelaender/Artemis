@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { HttpResponse } from '@angular/common/http';
 import { Result } from 'app/entities/result.model';
-import { TextAssessmentsService } from 'app/exercises/text/assess/text-assessments.service';
+import { TextAssessmentsService } from '../text-assessments.service';
 import { TextSubmissionService } from 'app/exercises/text/participate/text-submission.service';
 import { getLatestSubmissionResult, Submission } from 'app/entities/submission.model';
 import { ExerciseService } from 'app/exercises/shared/exercise/exercise.service';
@@ -24,9 +24,6 @@ export class TextAssessmentDashboardComponent implements OnInit {
     reverse = false;
 
     private cancelConfirmationText: string;
-
-    // todo NR SE remove after refactoring hmtl function calls
-    getLatestSubmissionResult = getLatestSubmissionResult;
 
     constructor(
         private route: ActivatedRoute,
@@ -66,14 +63,15 @@ export class TextAssessmentDashboardComponent implements OnInit {
 
     private getSubmissions(): void {
         this.textSubmissionService
-            .getTextSubmissionsForExercise(this.exercise.id!, { submittedOnly: true })
+            .getTextSubmissionsForExerciseByCorrectionRound(this.exercise.id!, { submittedOnly: true })
             .map((response: HttpResponse<TextSubmission[]>) =>
                 response.body!.map((submission: TextSubmission) => {
-                    if (getLatestSubmissionResult(submission)) {
+                    const tmpResult = getLatestSubmissionResult(submission);
+                    if (tmpResult) {
                         // reconnect some associations
-                        getLatestSubmissionResult(submission)!.submission = submission;
-                        getLatestSubmissionResult(submission)!.participation = submission.participation;
-                        submission.participation!.results = [getLatestSubmissionResult(submission)!];
+                        tmpResult!.submission = submission;
+                        tmpResult!.participation = submission.participation;
+                        submission.participation!.results = [tmpResult!];
                     }
 
                     return submission;

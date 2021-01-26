@@ -18,6 +18,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import de.tum.in.www1.artemis.domain.*;
 import de.tum.in.www1.artemis.domain.enumeration.DifficultyLevel;
 import de.tum.in.www1.artemis.domain.enumeration.ExerciseMode;
+import de.tum.in.www1.artemis.domain.enumeration.IncludedInOverallScore;
 import de.tum.in.www1.artemis.domain.enumeration.Language;
 import de.tum.in.www1.artemis.domain.exam.ExerciseGroup;
 import de.tum.in.www1.artemis.domain.participation.Participation;
@@ -146,7 +147,7 @@ public class TextExerciseIntegrationTest extends AbstractSpringIntegrationBamboo
 
         assertThat(newTextExercise.getTitle()).as("text exercise title was correctly set").isEqualTo(title);
         assertThat(newTextExercise.getDifficulty()).as("text exercise difficulty was correctly set").isEqualTo(difficulty);
-        assertThat(!newTextExercise.hasCourse()).as("course was not set for exam exercise");
+        assertThat(!newTextExercise.isCourseExercise()).as("course was not set for exam exercise");
         assertThat(newTextExercise.getExerciseGroup()).as("exerciseGroup was set for exam exercise").isNotNull();
         assertThat(newTextExercise.getExerciseGroup().getId()).as("exerciseGroupId was set correctly").isEqualTo(exerciseGroup.getId());
     }
@@ -167,6 +168,37 @@ public class TextExerciseIntegrationTest extends AbstractSpringIntegrationBamboo
         TextExercise textExercise = ModelFactory.generateTextExerciseForExam(null);
 
         request.postWithResponseBody("/api/text-exercises/", textExercise, TextExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createTextExercise_InvalidMaxScore() throws Exception {
+        final Course course = database.addCourseWithOneReleasedTextExercise();
+        TextExercise textExercise = textExerciseRepository.findByCourseId(course.getId()).get(0);
+        textExercise.setMaxScore(0.0);
+        request.postWithResponseBody("/api/text-exercises", textExercise, TextExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createTextExercise_IncludedAsBonusInvalidBonusPoints() throws Exception {
+        final Course course = database.addCourseWithOneReleasedTextExercise();
+        TextExercise textExercise = textExerciseRepository.findByCourseId(course.getId()).get(0);
+        textExercise.setMaxScore(10.0);
+        textExercise.setBonusPoints(1.0);
+        textExercise.setIncludedInOverallScore(IncludedInOverallScore.INCLUDED_AS_BONUS);
+        request.postWithResponseBody("/api/text-exercises", textExercise, TextExercise.class, HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @WithMockUser(username = "instructor1", roles = "INSTRUCTOR")
+    public void createTextExercise_NotIncludedInvalidBonusPoints() throws Exception {
+        final Course course = database.addCourseWithOneReleasedTextExercise();
+        TextExercise textExercise = textExerciseRepository.findByCourseId(course.getId()).get(0);
+        textExercise.setMaxScore(10.0);
+        textExercise.setBonusPoints(1.0);
+        textExercise.setIncludedInOverallScore(IncludedInOverallScore.NOT_INCLUDED);
+        request.postWithResponseBody("/api/text-exercises", textExercise, TextExercise.class, HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -217,7 +249,7 @@ public class TextExerciseIntegrationTest extends AbstractSpringIntegrationBamboo
 
         assertThat(updatedTextExercise.getTitle()).as("text exercise title was correctly updated").isEqualTo(updateTitle);
         assertThat(updatedTextExercise.getDifficulty()).as("text exercise difficulty was correctly updated").isEqualTo(updateDifficulty);
-        assertThat(!updatedTextExercise.hasCourse()).as("course was not set for exam exercise");
+        assertThat(!updatedTextExercise.isCourseExercise()).as("course was not set for exam exercise");
         assertThat(updatedTextExercise.getExerciseGroup()).as("exerciseGroup was set for exam exercise").isNotNull();
         assertThat(updatedTextExercise.getExerciseGroup().getId()).as("exerciseGroupId was not updated").isEqualTo(exerciseGroup.getId());
     }

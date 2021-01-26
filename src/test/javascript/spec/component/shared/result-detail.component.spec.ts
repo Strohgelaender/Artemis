@@ -320,7 +320,8 @@ describe('ResultDetailComponent', () => {
 
         expect(comp.filteredFeedbackList).to.have.deep.members(expectedItems);
         expect(comp.showScoreChartTooltip).to.equal(true);
-        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(7, 5, 6, exercise);
+
+        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(7, 5, 6, 100, 100);
         checkChartPreset(2, 5, '7', '5 of 6');
         expect(comp.isLoading).to.be.false;
 
@@ -334,7 +335,7 @@ describe('ResultDetailComponent', () => {
         comp.ngOnInit();
 
         expect(comp.filteredFeedbackList).to.have.deep.members(expectedItems);
-        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(104, 5, 6, exercise);
+        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(104, 5, 6, 100, 100);
         checkChartPreset(99, 1, '100 of 104', '1 of 6');
 
         // test negative > positive, limit at 0
@@ -349,7 +350,7 @@ describe('ResultDetailComponent', () => {
         comp.ngOnInit();
 
         expect(comp.filteredFeedbackList).to.have.deep.members(expectedItems);
-        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(7, 22, 206, exercise);
+        expect(chartSetValuesSpy).to.have.been.calledOnceWithExactly(7, 22, 206, 100, 100);
         checkChartPreset(0, 7, '7', '7 of 206');
     });
 

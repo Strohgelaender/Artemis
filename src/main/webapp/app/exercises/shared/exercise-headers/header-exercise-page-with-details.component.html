@@ -64,7 +64,7 @@
                     </h5>
                 </div>
             </div>
-            <div class="row" *ngIf="exercise.maxScore">
+            <div class="row" *ngIf="exercise.maxScore != undefined">
                 <div class="col-6">
                     <h5>{{ 'artemisApp.courseOverview.exerciseDetails.points' | translate }}</h5>
                 </div>
@@ -72,6 +72,16 @@
                     <h5>
                         {{ exercise.maxScore }}
                         <span *ngIf="exercise.bonusPoints">({{ 'artemisApp.courseOverview.exerciseDetails.bonus' | translate }} {{ exercise.bonusPoints }})</span>
+                    </h5>
+                </div>
+            </div>
+            <div class="row" *ngIf="exercise.includedInOverallScore != undefined && exercise.includedInOverallScore != IncludedInOverallScore.INCLUDED_COMPLETELY">
+                <div class="col-6">
+                    <h5>{{ 'artemisApp.exercise.includedInOverallScore' | translate }}:</h5>
+                </div>
+                <div class="col-6">
+                    <h5>
+                        <jhi-included-in-score-badge [includedInOverallScore]="exercise.includedInOverallScore"></jhi-included-in-score-badge>
                     </h5>
                 </div>
             </div>

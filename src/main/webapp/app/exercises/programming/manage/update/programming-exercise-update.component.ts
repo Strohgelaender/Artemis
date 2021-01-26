@@ -7,13 +7,12 @@ import { CourseManagementService } from 'app/course/manage/course-management.ser
 import { ProgrammingExercise, ProgrammingLanguage, ProjectType } from 'app/entities/programming-exercise.model';
 import { ProgrammingExerciseService } from '../services/programming-exercise.service';
 import { FileService } from 'app/shared/http/file.service';
-import { MAX_SCORE_PATTERN } from 'app/app.constants';
 import { TranslateService } from '@ngx-translate/core';
 import { switchMap, tap } from 'rxjs/operators';
 import { FeatureToggle } from 'app/shared/feature-toggle/feature-toggle.service';
 import { ExerciseService } from 'app/exercises/shared/exercise/exercise.service';
 import { AssessmentType } from 'app/entities/assessment-type.model';
-import { Exercise, ExerciseCategory } from 'app/entities/exercise.model';
+import { Exercise, ExerciseCategory, IncludedInOverallScore } from 'app/entities/exercise.model';
 import { EditorMode } from 'app/shared/markdown-editor/markdown-editor.component';
 import { KatexCommand } from 'app/shared/markdown-editor/commands/katex.command';
 import { ProfileService } from 'app/shared/layouts/profiles/profile.service';
@@ -27,6 +26,8 @@ import { ProgrammingLanguageFeatureService } from 'app/exercises/programming/sha
     styleUrls: ['../programming-exercise-form.scss'],
 })
 export class ProgrammingExerciseUpdateComponent implements OnInit {
+    readonly IncludedInOverallScore = IncludedInOverallScore;
+
     FeatureToggle = FeatureToggle;
     ProgrammingLanguage = ProgrammingLanguage;
     ProjectType = ProjectType;
@@ -51,7 +52,6 @@ export class ProgrammingExerciseUpdateComponent implements OnInit {
     // This is used to revert the select if the user cancels to override the new selected project type.
     private selectedProjectTypeValue: ProjectType;
 
-    maxScorePattern = MAX_SCORE_PATTERN;
     maxPenaltyPattern = '^([0-9]|([1-9][0-9])|100)$';
     // Java package name Regex according to Java 14 JLS (https://docs.oracle.com/javase/specs/jls/se14/html/jls-7.html#jls-7.4.1),
     // with the restriction to a-z,A-Z,_ as "Java letter" and 0-9 as digits due to JavaScript/Browser Unicode character class limitations
@@ -88,6 +88,7 @@ export class ProgrammingExerciseUpdateComponent implements OnInit {
     // Additional options for import
     public recreateBuildPlans = false;
     public updateTemplate = false;
+    public originalStaticCodeAnalysisEnabled: boolean | undefined;
 
     public projectTypes: ProjectType[] = [];
 
@@ -249,6 +250,7 @@ export class ProgrammingExerciseUpdateComponent implements OnInit {
      */
     private createProgrammingExerciseForImport(params: Params) {
         this.isImport = true;
+        this.originalStaticCodeAnalysisEnabled = this.programmingExercise.staticCodeAnalysisEnabled;
         // The source exercise is injected via the Resolver. The route parameters determine the target exerciseGroup or course
         if (params['courseId'] && params['examId'] && params['groupId']) {
             this.exerciseGroupService.find(params['courseId'], params['examId'], params['groupId']).subscribe((res) => {
@@ -400,6 +402,22 @@ export class ProgrammingExerciseUpdateComponent implements OnInit {
     }
 
     onStaticCodeAnalysisChanged() {
+        // On import: If SCA mode changed, activate recreation of build plans and update of the template
+        if (this.isImport && this.programmingExercise.staticCodeAnalysisEnabled !== this.originalStaticCodeAnalysisEnabled) {
+            this.recreateBuildPlans = true;
+            this.updateTemplate = true;
+        }
+
+        if (!this.programmingExercise.staticCodeAnalysisEnabled) {
+            this.programmingExercise.maxStaticCodeAnalysisPenalty = undefined;
+        }
+    }
+
+    onRecreateBuildPlanOrUpdateTemplateChange() {
+        if (!this.recreateBuildPlans || !this.updateTemplate) {
+            this.programmingExercise.staticCodeAnalysisEnabled = this.originalStaticCodeAnalysisEnabled;
+        }
+
         if (!this.programmingExercise.staticCodeAnalysisEnabled) {
             this.programmingExercise.maxStaticCodeAnalysisPenalty = undefined;
         }
@@ -435,5 +453,12 @@ export class ProgrammingExerciseUpdateComponent implements OnInit {
                 this.problemStatementLoaded = true;
             },
         );
+    }
+
+    /**
+     * checking if at least one of Online Editor or Offline Ide is selected
+     */
+    validIdeSelection() {
+        return this.programmingExercise.allowOnlineEditor || this.programmingExercise.allowOfflineIde;
     }
 }

@@ -27,15 +27,14 @@ public interface StudentExamRepository extends JpaRepository<StudentExam, Long> 
     @Query("select distinct se from StudentExam se left join fetch se.exercises e where se.testRun = false and se.exam.id = :#{#examId} and se.user.id = :#{#userId} ")
     Optional<StudentExam> findWithExercisesByUserIdAndExamId(@Param("userId") long userId, @Param("examId") long examId);
 
-    @Query("select distinct se from StudentExam se left join fetch se.exercises e left join fetch e.studentParticipations sp left join fetch sp.submissions s where se.id = :#{#studentExamId} and sp.student.id = :#{#studentId} and se.testRun = :#{#testRun}")
-    Optional<StudentExam> findWithExercisesParticipationsSubmissionsByIdForUser(@Param("studentExamId") Long studentExamId, @Param("studentId") Long studentId,
-            @Param("testRun") boolean testRun);
-
-    @Query("select distinct se from StudentExam se left join fetch se.exercises e left join fetch e.studentParticipations sp left join fetch sp.submissions s where se.id = :#{#studentExamId} and se.testRun = :#{#testRun}")
-    Optional<StudentExam> findWithExercisesParticipationsSubmissionsById(@Param("studentExamId") Long studentExamId, @Param("testRun") boolean testRun);
+    @Query("select distinct se from StudentExam se left join fetch se.exercises e left join fetch e.studentParticipations sp left join fetch sp.submissions s where se.id = :#{#studentExamId} and se.testRun = :#{#isTestRun}")
+    Optional<StudentExam> findWithExercisesParticipationsSubmissionsById(@Param("studentExamId") Long studentExamId, @Param("isTestRun") boolean isTestRun);
 
     @Query("select se from StudentExam se where se.exam.id = :#{#examId} and se.testRun = false")
-    List<StudentExam> findByExamId(@Param("examId") Long examId);
+    Set<StudentExam> findByExamId(@Param("examId") Long examId);
+
+    @Query("select se from StudentExam se left join fetch se.exercises e where se.exam.id = :#{#examId} and se.testRun = false")
+    Set<StudentExam> findAllWithExercisesByExamId(@Param("examId") Long examId);
 
     @Query("select se from StudentExam se where se.exam.id = :#{#examId} and se.testRun = true")
     List<StudentExam> findAllTestRunsByExamId(@Param("examId") Long examId);
@@ -61,4 +60,6 @@ public interface StudentExamRepository extends JpaRepository<StudentExam, Long> 
     @Query("select distinct u from StudentExam se left join se.user u where se.testRun = false and se.exam.id = :#{#examId}")
     Set<User> findUsersWithStudentExamsForExam(@Param("examId") Long examId);
 
+    @Query("SELECT studentExam FROM StudentExam studentExam LEFT JOIN FETCH studentExam.exercises exercises WHERE studentExam.exam.id = :#{#examId} AND studentExam.submitted = FALSE AND studentExam.testRun = FALSE")
+    Set<StudentExam> findAllUnsubmittedWithExercisesByExamId(Long examId);
 }

@@ -95,7 +95,12 @@ export class ShortAnswerQuestionEditComponent implements OnInit, OnChanges, Afte
          * these [ ] brackets.
          * **/
         const textForEachLine = this.question.text!.split(/\n+/g);
-        this.textParts = textForEachLine.map((t) => t.split(/\s+(?![^[]]*])/g));
+        this.textParts = textForEachLine.map((t) => {
+            const indentation = this.shortAnswerQuestionUtil.getIndentation(t);
+            const lineParts = t.split(/\s+(?![^[]]*])/g);
+            lineParts[1] = indentation.concat(lineParts[1]);
+            return lineParts;
+        });
 
         /** Assign status booleans and strings **/
         this.showVisualMode = false;
@@ -696,4 +701,14 @@ export class ShortAnswerQuestionEditComponent implements OnInit, OnChanges, Afte
      * @desc reset the question and calls the parsing method of the markdown editor
      */
     prepareForSave(): void {}
+
+    /**
+     * @function toggleExactMatchCheckbox
+     * @desc Sets the similarity value to 100 if the checkbox was checked or to 85 if it was unchecked
+     * @param checked
+     */
+    toggleExactMatchCheckbox(checked: boolean): void {
+        this.question.similarityValue = checked ? 100 : 85;
+        this.questionUpdated.emit();
+    }
 }
