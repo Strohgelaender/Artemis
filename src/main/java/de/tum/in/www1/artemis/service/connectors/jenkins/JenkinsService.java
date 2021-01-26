@@ -431,17 +431,17 @@ public class JenkinsService extends AbstractContinuousIntegrationService {
             final var build = getJob(projectKey, buildPlanId).getLastBuild();
             final var logHtml = Jsoup.parse(build.details().getConsoleOutputHtml()).body();
 
-            List<BuildLogEntry> buildLog;
+            List<BuildLogEntry> buildLogs;
             try {
-                buildLog = parsePipelineLogs(logHtml);
+                buildLogs = parsePipelineLogs(logHtml);
             }
             catch (IllegalArgumentException e) {
-                buildLog = parseLogsLegacy(logHtml);
+                buildLogs = parseLogsLegacy(logHtml);
             }
 
             // Jenkins logs all steps of the build pipeline. We remove those as they are irrelevant to the students
             List<BuildLogEntry> prunedBuildLogs = new ArrayList<>();
-            for (BuildLogEntry entry : buildLog) {
+            for (BuildLogEntry entry : buildLogs) {
                 String logString = entry.getLog();
                 if (logString.contains("Compilation failure")) {
                     break;
@@ -512,7 +512,7 @@ public class JenkinsService extends AbstractContinuousIntegrationService {
                             log = log.replace("\u001B[1;34m", "");
                             log = log.replace("\u001B[m", "");
                             log = log.replace("\u001B[1;31m", "");
-                            buildLog.add(new BuildLogEntry(time, stripLogEndOfLine(log).trim()));
+                            buildLogs.add(new BuildLogEntry(time, stripLogEndOfLine(log).trim()));
                         }
                         else {
                             // Log is from the same line as the last

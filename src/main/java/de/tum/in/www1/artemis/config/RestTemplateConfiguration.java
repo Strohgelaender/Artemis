@@ -67,21 +67,18 @@ public class RestTemplateConfiguration {
 
     @Bean
     @Profile("gitlab")
-    @Autowired
     public RestTemplate shortTimeoutGitlabRestTemplate(GitLabAuthorizationInterceptor gitlabInterceptor) {
         return initializeRestTemplateWithInterceptors(gitlabInterceptor, createShortTimeoutRestTemplate());
     }
 
     @Bean
     @Profile("jenkins")
-    @Autowired
     public RestTemplate shortTimeoutJenkinsRestTemplate(JenkinsAuthorizationInterceptor jenkinsInterceptor) {
         return initializeRestTemplateWithInterceptors(jenkinsInterceptor, createShortTimeoutRestTemplate());
     }
 
     @Bean
     @Profile("jira")
-    @Autowired
     public RestTemplate shortTimeoutJiraRestTemplate(JiraAuthorizationInterceptor jiraAuthorizationInterceptor) {
         return initializeRestTemplateWithInterceptors(jiraAuthorizationInterceptor, createShortTimeoutRestTemplate());
     }
@@ -101,7 +98,7 @@ public class RestTemplateConfiguration {
     @Bean
     @Profile("athene")
     public RestTemplate atheneRestTemplate(AtheneAuthorizationInterceptor atheneAuthorizationInterceptor) {
-        return initializeRestTemplateWithInterceptors(atheneAuthorizationInterceptor);
+        return initializeRestTemplateWithInterceptors(atheneAuthorizationInterceptor, createRestTemplate());
     }
 
     @NotNull
