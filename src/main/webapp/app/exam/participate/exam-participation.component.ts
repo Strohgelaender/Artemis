@@ -149,11 +149,6 @@ export class ExamParticipationComponent implements OnInit, OnDestroy, ComponentC
                         this.testRunStartTime = moment();
                         this.initIndividualEndDates(this.testRunStartTime);
                         this.loadingExam = false;
-
-                        // Directly start the exam when we continue from a failed save
-                        if (!this.examParticipationService.wasLastSaveSuccessful(this.courseId, this.examId)) {
-                            this.examStarted(this.studentExam);
-                        }
                     },
                     // if error occurs
                     () => (this.loadingExam = false),
@@ -173,15 +168,21 @@ export class ExamParticipationComponent implements OnInit, OnDestroy, ComponentC
                         }
 
                         // Directly start the exam when we continue from a failed save
-                        if (!this.examParticipationService.wasLastSaveSuccessful(this.courseId, this.examId)) {
-                            this.examParticipationService.loadStudentExamWithExercisesForConduction(this.exam.course!.id!, this.exam.id!).subscribe((exam: StudentExam) => {
-                                this.studentExam = exam;
-                                this.examParticipationService.saveStudentExamToLocalStorage(this.exam.course!.id!, this.exam.id!, exam);
+                        if (this.examParticipationService.lastSaveFailed(this.courseId, this.examId)) {
+                            console.log('loading from local storage');
+                            this.examParticipationService
+                                .loadStudentExamWithExercisesForConductionFromLocalStorage(this.exam.course!.id!, this.exam.id!)
+                                .subscribe((localExam: StudentExam) => {
+                                    this.studentExam = localExam;
+                                    this.examParticipationService.saveStudentExamToLocalStorage(this.exam.course!.id!, this.exam.id!, localExam);
 
-                                this.loadingExam = false;
-                                this.examStarted(this.studentExam);
-                            });
+                                    this.loadingExam = false;
+                                    console.log('loaded from local storage');
+                                    console.log(this.studentExam);
+                                    this.examStarted(this.studentExam);
+                                });
                         } else {
+                            console.log('finished loading exam');
                             this.loadingExam = false;
                         }
                     },
@@ -633,13 +634,13 @@ export class ExamParticipationComponent implements OnInit, OnDestroy, ComponentC
     }
 
     private onSaveSubmissionSuccess(submission: Submission) {
-        this.examParticipationService.setLastSaveSubmissionSuccessful(true, this.courseId, this.examId);
+        this.examParticipationService.setLastSaveFailed(false, this.courseId, this.examId);
         submission.isSynced = true;
         submission.submitted = true;
     }
 
     private onSaveSubmissionError(error: HttpErrorResponse) {
-        this.examParticipationService.setLastSaveSubmissionSuccessful(false, this.courseId, this.examId);
+        this.examParticipationService.setLastSaveFailed(true, this.courseId, this.examId);
 
         if (error.status === 401) {
             // Unauthorized means the user needs to login to resume
