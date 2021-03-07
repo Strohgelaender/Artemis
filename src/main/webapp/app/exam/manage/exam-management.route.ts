@@ -34,6 +34,16 @@ import { ExamParticipationComponent } from 'app/exam/participate/exam-participat
 import { PendingChangesGuard } from 'app/shared/guard/pending-changes.guard';
 import { Authority } from 'app/shared/constants/authority.constants';
 import { ExerciseAssessmentDashboardComponent } from 'app/exercises/shared/dashboards/tutor/exercise-assessment-dashboard.component';
+import { ParticipationSubmissionComponent } from 'app/exercises/shared/participation-submission/participation-submission.component';
+import { FileUploadAssessmentComponent } from 'app/exercises/file-upload/assess/file-upload-assessment.component';
+import { ParticipationComponent } from 'app/exercises/shared/participation/participation.component';
+import { ExerciseScoresComponent } from 'app/exercises/shared/exercise-scores/exercise-scores.component';
+import { FileUploadAssessmentDashboardComponent } from 'app/exercises/file-upload/assess/file-upload-assessment-dashboard.component';
+import { TextAssessmentDashboardComponent } from 'app/exercises/text/assess/text-assessment-dashboard/text-assessment-dashboard.component';
+import { TextSubmissionAssessmentComponent } from 'app/exercises/text/assess/text-submission-assessment.component';
+import { TextFeedbackConflictsComponent } from 'app/exercises/text/assess/conflicts/text-feedback-conflicts.component';
+import { FeedbackConflictResolver, NewStudentParticipationResolver, StudentParticipationResolver } from 'app/exercises/text/assess/text-submission-assessment.route';
+import { ModelingAssessmentDashboardComponent } from 'app/exercises/modeling/assess/modeling-assessment-editor/modeling-assessment-dashboard.component';
 
 @Injectable({ providedIn: 'root' })
 export class ExamResolve implements Resolve<Exam> {
@@ -481,6 +491,115 @@ export const examManagementRoute: Routes = [
             usePathForBreadcrumbs: true,
             pageTitle: 'artemisApp.exerciseAssessmentDashboard.testRunPageHeader',
         },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/exercises/:exerciseId/scores',
+        component: ExerciseScoresComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            usePathForBreadcrumbs: true,
+            pageTitle: 'instructorDashboard.exerciseDashboard',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/exercises/:exerciseId/participations',
+        component: ParticipationComponent,
+        data: {
+            authorities: [Authority.TA, Authority.INSTRUCTOR, Authority.ADMIN],
+            pageTitle: 'artemisApp.participation.home.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/exercises/:exerciseId/participations/:participationId',
+        component: ParticipationSubmissionComponent,
+        data: {
+            authorities: [Authority.INSTRUCTOR, Authority.ADMIN],
+            pageTitle: 'artemisApp.participation.home.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/file-upload-exercises/:exerciseId/submissions/:submissionId/assessment',
+        component: FileUploadAssessmentComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            usePathForBreadcrumbs: true,
+            pageTitle: 'artemisApp.fileUploadExercise.home.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/file-upload-exercises/:exerciseId/assessment',
+        component: FileUploadAssessmentDashboardComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            usePathForBreadcrumbs: true,
+            pageTitle: 'assessmentDashboard.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/text-exercises/:exerciseId/assessment',
+        component: TextAssessmentDashboardComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            pageTitle: 'assessmentDashboard.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    /*
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/text-exercises/:exerciseId/submissions/new/assessment',
+        component: TextSubmissionAssessmentComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            pageTitle: 'artemisApp.textAssessment.title',
+        },
+        resolve: {
+            studentParticipation: NewStudentParticipationResolver,
+        },
+        runGuardsAndResolvers: 'always',
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/text-exercises/:exerciseId/submissions/:submissionId/assessment',
+        component: TextSubmissionAssessmentComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            pageTitle: 'artemisApp.textAssessment.title',
+        },
+        resolve: {
+            studentParticipation: StudentParticipationResolver,
+        },
+        runGuardsAndResolvers: 'paramsChange',
+        canActivate: [UserRouteAccessService],
+    },
+    */
+    {
+        path: ':courseId/modeling-exercises/:exerciseId/assessment',
+        component: ModelingAssessmentDashboardComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            usePathForBreadcrumbs: true,
+            pageTitle: 'assessmentDashboard.title',
+        },
+        canActivate: [UserRouteAccessService],
+    },
+    {
+        path: ':examId/exercise-groups/:exerciseGroupId/text-exercises/:exerciseId/submissions/:submissionId/text-feedback-conflict/:feedbackId',
+        component: TextFeedbackConflictsComponent,
+        data: {
+            authorities: [Authority.ADMIN, Authority.INSTRUCTOR, Authority.TA],
+            usePathForBreadcrumbs: true,
+            pageTitle: 'artemisApp.textAssessment.title',
+        },
+        resolve: {
+            conflictingTextSubmissions: FeedbackConflictResolver,
+        },
+        runGuardsAndResolvers: 'always',
         canActivate: [UserRouteAccessService],
     },
 ];
